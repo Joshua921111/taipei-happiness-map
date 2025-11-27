@@ -12,12 +12,9 @@ app = Flask(__name__)
 # ==========================================
 # 2. 全臺北市幸福地點資料庫 (Simulated OpenData)
 # ==========================================
-# 數據邏輯說明：
-# pm25 (0-100): 越低越好 (空氣品質)
-# noise (0-100): 越低越安靜 (噪音監測)
-# green (0-100): 越高越綠 (公園處資料)
-# art (0-100): 越高藝文氣息越重 (文化局資料)
-# sport (0-100): 越高運動設施越完善 (體育局資料)
+# 為了讓地圖更豐富，這裡擴充了台北市主要行政區的指標性地點
+# 數據邏輯：
+# pm25: 低=好, noise: 低=靜, green: 高=綠, art: 高=文, sport: 高=動
 
 LOCATIONS = [
     # --- 中正區 ---
@@ -232,7 +229,6 @@ def calculate_happiness_indices(loc_data):
     healing = loc_data['green']
 
     # 3. 活力值 (Vitality): 喜歡藝文活動與人氣(適度噪音)
-    # 如果完全沒聲音(noise<20)其實不夠有活力，所以活力與噪音有關聯但非正比
     vitality = min(100, (loc_data['art'] * 0.8 + loc_data['sport'] * 0.2 + loc_data['noise'] * 0.3))
 
     # 4. 能量值 (Energy): 專指運動
@@ -313,7 +309,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>臺北市幸福鈴 | 城市幸福地圖</title>
+    <title>臺北市幸福鈴 | 城市幸福地圖 v2.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
@@ -322,6 +318,7 @@ HTML_TEMPLATE = """
         #map { height: 100%; width: 100%; z-index: 1; }
         .mood-btn.active { background-color: #3b82f6; color: white; border-color: #3b82f6; }
         .mood-btn.active i { color: white; }
+        .mood-btn.active span { color: white; }
         /* 隱藏 Scrollbar 但保持功能 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -364,8 +361,6 @@ HTML_TEMPLATE = """
         <!-- Control Panel (Mobile: Bottom Sheet, Desktop: Left Sidebar) -->
         <div class="absolute bottom-0 w-full md:relative md:w-1/3 md:order-1 md:h-full z-20 flex flex-col pointer-events-none md:pointer-events-auto">
             
-            <!-- Mobile Toggle Button (Optional, simple implementation here) -->
-            
             <div class="bg-white rounded-t-2xl md:rounded-none shadow-[0_-5px_20px_rgba(0,0,0,0.1)] flex flex-col h-[50vh] md:h-full pointer-events-auto transition-all duration-300">
                 
                 <!-- Handle bar for mobile -->
@@ -377,19 +372,19 @@ HTML_TEMPLATE = """
                 <div class="p-4 border-b shrink-0">
                     <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">我想尋找...</h2>
                     <div class="grid grid-cols-4 gap-2">
-                        <button onclick="changeMood('relax')" class="mood-btn border border-gray-100 bg-gray-50 text-gray-600 p-2 rounded-xl flex flex-col items-center gap-1 transition-all active:scale-95">
+                        <button onclick="changeMood('relax')" class="mood-btn border border-gray-100 bg-gray-50 text-gray-600 p-2 rounded-xl flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-gray-100">
                             <i class="fa-solid fa-wind text-lg text-blue-400"></i>
                             <span class="text-xs font-bold">放鬆</span>
                         </button>
-                        <button onclick="changeMood('heal')" class="mood-btn border border-gray-100 bg-gray-50 text-gray-600 p-2 rounded-xl flex flex-col items-center gap-1 transition-all active:scale-95">
+                        <button onclick="changeMood('heal')" class="mood-btn border border-gray-100 bg-gray-50 text-gray-600 p-2 rounded-xl flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-gray-100">
                             <i class="fa-solid fa-tree text-lg text-green-500"></i>
                             <span class="text-xs font-bold">療癒</span>
                         </button>
-                        <button onclick="changeMood('vitality')" class="mood-btn border border-gray-100 bg-gray-50 text-gray-600 p-2 rounded-xl flex flex-col items-center gap-1 transition-all active:scale-95">
+                        <button onclick="changeMood('vitality')" class="mood-btn border border-gray-100 bg-gray-50 text-gray-600 p-2 rounded-xl flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-gray-100">
                             <i class="fa-solid fa-palette text-lg text-purple-500"></i>
                             <span class="text-xs font-bold">藝文</span>
                         </button>
-                        <button onclick="changeMood('sport')" class="mood-btn border border-gray-100 bg-gray-50 text-gray-600 p-2 rounded-xl flex flex-col items-center gap-1 transition-all active:scale-95">
+                        <button onclick="changeMood('sport')" class="mood-btn border border-gray-100 bg-gray-50 text-gray-600 p-2 rounded-xl flex flex-col items-center gap-1 transition-all active:scale-95 hover:bg-gray-100">
                             <i class="fa-solid fa-person-running text-lg text-red-500"></i>
                             <span class="text-xs font-bold">運動</span>
                         </button>
@@ -447,11 +442,16 @@ HTML_TEMPLATE = """
                 maxZoom: 19
             }).addTo(map);
 
-            // 自定義 Zoom Control 位置
             L.control.zoom({ position: 'topright' }).addTo(map);
 
             fetchLocations('all');
         }
+
+        // --- 修正點：補上這個被遺漏的函式 ---
+        function changeMood(mood) {
+            fetchLocations(mood);
+        }
+        // ------------------------------------
 
         async function fetchLocations(mood) {
             // UI 更新
@@ -538,7 +538,6 @@ HTML_TEMPLATE = """
                 card.onclick = () => {
                     map.flyTo([loc.lat, loc.lng], 16, { duration: 1.5 });
                     setTimeout(() => marker.openPopup(), 1500);
-                    // Mobile: Scroll map into view if needed (optional)
                 };
 
                 list.appendChild(card);
@@ -573,7 +572,6 @@ HTML_TEMPLATE = """
                 
                 const modal = document.getElementById('modal');
                 modal.classList.remove('hidden');
-                // Animation
                 setTimeout(() => {
                     modal.classList.remove('opacity-0');
                     modal.querySelector('div').classList.remove('scale-90');
@@ -598,8 +596,3 @@ HTML_TEMPLATE = """
     </script>
 </body>
 </html>
-"""
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
