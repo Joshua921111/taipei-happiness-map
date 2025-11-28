@@ -6,191 +6,167 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (對應簡報：客觀環境數據)
+# 1. 模擬 OpenData 數據庫 (社群熱點 + 展演場館版)
 # ==========================================
-# 這裡的數據直接對應簡報中的「空氣品質」、「綠地」、「藝文」、「運動」、「噪音」
-# 數值定義：0 (差) - 100 (優/高)
+# 數據邏輯：pm25(低優), noise(低優), green(高優), art(高優), sport(高優)
 
 LOCATIONS = [
     # --- 中正區 ---
     {
         "id": 101, "name": "中正紀念堂", "district": "中正區",
         "lat": 25.0348, "lng": 121.5217,
-        "description": "宏偉的藍白建築與廣闊廣場，藝文與散步的絕佳交會點。",
+        "description": "藍白建築與廣闊廣場，國際級展覽與藝文活動的首選展場。",
         "data": {"pm25": 25, "noise": 55, "green": 60, "art": 95, "sport": 40}
     },
     {
         "id": 102, "name": "華山1914文創園區", "district": "中正區",
         "lat": 25.0441, "lng": 121.5293,
-        "description": "舊酒廠變身的前衛藝術基地，展覽與市集的聚集地。",
+        "description": "文青必訪的展演基地，匯集設計展、快閃店與草地野餐。",
         "data": {"pm25": 30, "noise": 65, "green": 40, "art": 100, "sport": 10}
     },
     {
-        "id": 103, "name": "臺北植物園", "district": "中正區",
-        "lat": 25.0333, "lng": 121.5096,
-        "description": "城市中的綠色圖書館，荷花池畔的寧靜時光。",
-        "data": {"pm25": 15, "noise": 40, "green": 95, "art": 30, "sport": 20}
+        "id": 103, "name": "榕錦時光生活園區", "district": "中正區",
+        "lat": 25.0322, "lng": 121.5265,
+        "description": "原臺北刑務所官舍修復，日式老宅氛圍的IG熱門打卡點。",
+        "data": {"pm25": 20, "noise": 45, "green": 50, "art": 85, "sport": 5}
     },
+    {
+        "id": 104, "name": "寶藏巖國際藝術村", "district": "中正區",
+        "lat": 25.0105, "lng": 121.5323,
+        "description": "依山而建的歷史聚落，共生藝術與獨特地景的探索秘境。",
+        "data": {"pm25": 15, "noise": 30, "green": 80, "art": 95, "sport": 30}
+    },
+
     # --- 大安區 ---
     {
         "id": 201, "name": "大安森林公園", "district": "大安區",
         "lat": 25.0300, "lng": 121.5358,
-        "description": "臺北之肺，擁有豐富生態與露天音樂台的都會綠洲。",
+        "description": "城市之肺，適合野餐、慢跑與欣賞露天音樂表演。",
         "data": {"pm25": 18, "noise": 45, "green": 100, "art": 40, "sport": 60}
     },
     {
-        "id": 202, "name": "大安運動中心", "district": "大安區",
-        "lat": 25.0204, "lng": 121.5451,
-        "description": "設施完善的現代化運動場館，釋放壓力的好去處。",
-        "data": {"pm25": 10, "noise": 60, "green": 10, "art": 5, "sport": 100}
+        "id": 202, "name": "忠泰美術館", "district": "大安區",
+        "lat": 25.0435, "lng": 121.5372,
+        "description": "專注於「未來」與「城市」議題的精品美術館展場。",
+        "data": {"pm25": 20, "noise": 50, "green": 20, "art": 95, "sport": 0}
     },
+
     # --- 信義區 ---
     {
-        "id": 301, "name": "象山親山步道", "district": "信義區",
-        "lat": 25.0273, "lng": 121.5707,
-        "description": "近距離欣賞台北101夜景的最佳登山步道。",
-        "data": {"pm25": 8, "noise": 30, "green": 90, "art": 10, "sport": 85}
+        "id": 301, "name": "松山文創園區", "district": "信義區",
+        "lat": 25.0439, "lng": 121.5606,
+        "description": "菸廠古蹟活化，結合誠品書店與設計展演的文化園區。",
+        "data": {"pm25": 22, "noise": 55, "green": 50, "art": 95, "sport": 20}
     },
     {
         "id": 302, "name": "四四南村", "district": "信義區",
         "lat": 25.0312, "lng": 121.5620,
-        "description": "繁華信義區中的眷村記憶，新舊交融的文青景點。",
+        "description": "信義區中的眷村記憶，週末簡單市集與藝文展演空間。",
         "data": {"pm25": 25, "noise": 50, "green": 30, "art": 85, "sport": 10}
     },
     {
-        "id": 303, "name": "松山文創園區", "district": "信義區",
-        "lat": 25.0439, "lng": 121.5606,
-        "description": "菸廠古蹟與生態池的結合，充滿設計感的休憩空間。",
-        "data": {"pm25": 22, "noise": 55, "green": 50, "art": 95, "sport": 20}
+        "id": 303, "name": "象山六巨石", "district": "信義區",
+        "lat": 25.0267, "lng": 121.5746,
+        "description": "社群媒體上最熱門的台北夜景拍攝點，揮灑汗水的絕佳步道。",
+        "data": {"pm25": 10, "noise": 30, "green": 90, "art": 10, "sport": 90}
     },
-    # --- 松山區 ---
-    {
-        "id": 401, "name": "彩虹橋河濱公園", "district": "松山區",
-        "lat": 25.0520, "lng": 121.5776,
-        "description": "基隆河畔的愛情地標，適合夜騎與漫步。",
-        "data": {"pm25": 20, "noise": 50, "green": 70, "art": 40, "sport": 80}
-    },
-    {
-        "id": 402, "name": "台北田徑場", "district": "松山區",
-        "lat": 25.0489, "lng": 121.5517,
-        "description": "國際級標準運動場，城市中心的熱血競技場。",
-        "data": {"pm25": 30, "noise": 70, "green": 20, "art": 10, "sport": 95}
-    },
-    # --- 士林區 ---
-    {
-        "id": 501, "name": "國立故宮博物院", "district": "士林區",
-        "lat": 25.1024, "lng": 121.5485,
-        "description": "世界級的中華文化寶庫，群山環抱的文化殿堂。",
-        "data": {"pm25": 12, "noise": 35, "green": 80, "art": 100, "sport": 10}
-    },
-    {
-        "id": 502, "name": "臺北表演藝術中心", "district": "士林區",
-        "lat": 25.0847, "lng": 121.5255,
-        "description": "獨特球體建築，匯聚國際級表演藝術的能量中心。",
-        "data": {"pm25": 35, "noise": 65, "green": 10, "art": 100, "sport": 0}
-    },
-    {
-        "id": 503, "name": "芝山文化生態綠園", "district": "士林區",
-        "lat": 25.1054, "lng": 121.5298,
-        "description": "全臺北市第一座文化生態公園，古蹟與自然的秘境。",
-        "data": {"pm25": 10, "noise": 25, "green": 95, "art": 60, "sport": 30}
-    },
-    # --- 北投區 ---
-    {
-        "id": 601, "name": "北投圖書館", "district": "北投區",
-        "lat": 25.1363, "lng": 121.5063,
-        "description": "全球最美公立圖書館之一，森林中的木造書屋。",
-        "data": {"pm25": 8, "noise": 30, "green": 95, "art": 70, "sport": 10}
-    },
-    {
-        "id": 602, "name": "法鼓山農禪寺", "district": "北投區",
-        "lat": 25.1257, "lng": 121.4984,
-        "description": "水月道場的空靈倒影，沉澱心靈的極致靜謐之地。",
-        "data": {"pm25": 10, "noise": 20, "green": 60, "art": 80, "sport": 5}
-    },
-    {
-        "id": 603, "name": "軍艦岩親山步道", "district": "北投區",
-        "lat": 25.1206, "lng": 121.5135,
-        "description": "巨岩崢嶸，登頂可360度俯瞰臺北盆地。",
-        "data": {"pm25": 5, "noise": 25, "green": 90, "art": 0, "sport": 90}
-    },
-    # --- 內湖區 ---
-    {
-        "id": 701, "name": "大湖公園", "district": "內湖區",
-        "lat": 25.0838, "lng": 121.5936,
-        "description": "錦帶橋與落羽松的絕美倒影，野餐與釣魚勝地。",
-        "data": {"pm25": 15, "noise": 40, "green": 90, "art": 20, "sport": 50}
-    },
-    {
-        "id": 702, "name": "內湖運動中心", "district": "內湖區",
-        "lat": 25.0718, "lng": 121.5750,
-        "description": "擁有攀岩場與射擊場的特色運動中心。",
-        "data": {"pm25": 20, "noise": 60, "green": 20, "art": 5, "sport": 95}
-    },
-    # --- 文山區 ---
-    {
-        "id": 801, "name": "臺北市立動物園", "district": "文山區",
-        "lat": 24.9983, "lng": 121.5810,
-        "description": "亞洲最大的動物園，親子共遊與生態教育的首選。",
-        "data": {"pm25": 12, "noise": 50, "green": 85, "art": 30, "sport": 70}
-    },
-    {
-        "id": 802, "name": "貓空壺穴步道", "district": "文山區",
-        "lat": 24.9669, "lng": 121.5888,
-        "description": "茶香與壺穴地形交織，遠離塵囂的品茗勝地。",
-        "data": {"pm25": 5, "noise": 30, "green": 95, "art": 40, "sport": 60}
-    },
-    # --- 萬華區 ---
-    {
-        "id": 901, "name": "西門紅樓", "district": "萬華區",
-        "lat": 25.0423, "lng": 121.5061,
-        "description": "百年紅磚樓中的創意市集，年輕活力的發源地。",
-        "data": {"pm25": 40, "noise": 85, "green": 5, "art": 80, "sport": 10}
-    },
-    {
-        "id": 902, "name": "青年公園", "district": "萬華區",
-        "lat": 25.0233, "lng": 121.5034,
-        "description": "南台北最大的公園，擁有多元運動設施與高爾夫球場。",
-        "data": {"pm25": 25, "noise": 55, "green": 90, "art": 20, "sport": 80}
-    },
-    # --- 大同區 ---
-    {
-        "id": 1001, "name": "大稻埕碼頭", "district": "大同區",
-        "lat": 25.0567, "lng": 121.5076,
-        "description": "落日餘暉下的貨櫃市集，享受河畔微風與美食。",
-        "data": {"pm25": 25, "noise": 60, "green": 40, "art": 60, "sport": 70}
-    },
-    {
-        "id": 1002, "name": "臺灣新文化運動紀念館", "district": "大同區",
-        "lat": 25.0593, "lng": 121.5137,
-        "description": "日治時期警察署古蹟，見證台灣文化覺醒的歷史現場。",
-        "data": {"pm25": 30, "noise": 45, "green": 20, "art": 95, "sport": 0}
-    },
+
     # --- 中山區 ---
     {
-        "id": 1101, "name": "臺北市立美術館", "district": "中山區",
+        "id": 401, "name": "臺北市立美術館", "district": "中山區",
         "lat": 25.0722, "lng": 121.5246,
-        "description": "臺灣首座現代美術館，純白建築中的藝術靈魂。",
+        "description": "臺灣首座現代美術館，純白建築與光影交織的藝術殿堂。",
         "data": {"pm25": 20, "noise": 40, "green": 50, "art": 100, "sport": 10}
     },
     {
-        "id": 1102, "name": "花博公園新生園區", "district": "中山區",
-        "lat": 25.0711, "lng": 121.5317,
-        "description": "擁有迷宮花園與玫瑰園，飛機從頭頂呼嘯而過的震撼。",
-        "data": {"pm25": 25, "noise": 75, "green": 85, "art": 30, "sport": 60}
+        "id": 402, "name": "心中山線形公園", "district": "中山區",
+        "lat": 25.0556, "lng": 121.5205,
+        "description": "串聯中山與雙連的綠色廊道，週末市集與年輕潮流聚集地。",
+        "data": {"pm25": 35, "noise": 65, "green": 70, "art": 60, "sport": 30}
     },
+    {
+        "id": 403, "name": "經國七海文化園區", "district": "中山區",
+        "lat": 25.0789, "lng": 121.5332,
+        "description": "結合古蹟、圖書館與劍潭湖美景的寧靜文化園區。",
+        "data": {"pm25": 15, "noise": 30, "green": 85, "art": 70, "sport": 20}
+    },
+
+    # --- 士林區 ---
+    {
+        "id": 501, "name": "臺北表演藝術中心", "district": "士林區",
+        "lat": 25.0847, "lng": 121.5255,
+        "description": "CNN評選全球最具變革性建築，國際級表演藝術場館。",
+        "data": {"pm25": 35, "noise": 65, "green": 10, "art": 100, "sport": 0}
+    },
+    {
+        "id": 502, "name": "國立故宮博物院", "district": "士林區",
+        "lat": 25.1024, "lng": 121.5485,
+        "description": "世界級中華文化寶庫，歷史迷與外國遊客必訪展場。",
+        "data": {"pm25": 12, "noise": 35, "green": 80, "art": 100, "sport": 10}
+    },
+
+    # --- 大同區 ---
+    {
+        "id": 601, "name": "台北當代藝術館", "district": "大同區",
+        "lat": 25.0504, "lng": 121.5186,
+        "description": "日治時期小學校舍改建，前衛當代藝術的指標性展場。",
+        "data": {"pm25": 30, "noise": 55, "green": 10, "art": 100, "sport": 0}
+    },
+    {
+        "id": 602, "name": "大稻埕碼頭", "district": "大同區",
+        "lat": 25.0567, "lng": 121.5076,
+        "description": "落日餘暉下的貨櫃市集，河畔騎車與小酌的放鬆聖地。",
+        "data": {"pm25": 25, "noise": 60, "green": 40, "art": 50, "sport": 70}
+    },
+
+    # --- 萬華區 ---
+    {
+        "id": 701, "name": "剝皮寮歷史街區", "district": "萬華區",
+        "lat": 25.0369, "lng": 121.5015,
+        "description": "清代街道風貌保存最完整的區域，經常舉辦藝文特展。",
+        "data": {"pm25": 35, "noise": 50, "green": 10, "art": 85, "sport": 5}
+    },
+    {
+        "id": 702, "name": "新富町文化市場", "district": "萬華區",
+        "lat": 25.0355, "lng": 121.5021,
+        "description": "馬蹄形古蹟市場變身文創基地，建築攝影愛好者必訪。",
+        "data": {"pm25": 30, "noise": 45, "green": 10, "art": 80, "sport": 0}
+    },
+
     # --- 南港區 ---
     {
-        "id": 1201, "name": "臺北流行音樂中心", "district": "南港區",
+        "id": 801, "name": "臺北流行音樂中心", "district": "南港區",
         "lat": 25.0519, "lng": 121.5985,
-        "description": "仿山巒起伏的建築，流行音樂的心臟地帶。",
+        "description": "仿山巒起伏的指標建築，流行音樂展演與文化的最高殿堂。",
         "data": {"pm25": 30, "noise": 60, "green": 40, "art": 95, "sport": 20}
     },
     {
-        "id": 1202, "name": "南港山水綠生態公園", "district": "南港區",
-        "lat": 25.0315, "lng": 121.6212,
-        "description": "垃圾掩埋場變身的超大綠地，生態復育的典範。",
-        "data": {"pm25": 15, "noise": 30, "green": 95, "art": 10, "sport": 50}
+        "id": 802, "name": "瓶蓋工廠台北製造所", "district": "南港區",
+        "lat": 25.0543, "lng": 121.6001,
+        "description": "老工廠翻新為職人手作基地，充滿工業風的展演空間。",
+        "data": {"pm25": 25, "noise": 50, "green": 30, "art": 80, "sport": 10}
+    },
+
+    # --- 北投區 ---
+    {
+        "id": 901, "name": "北投圖書館", "district": "北投區",
+        "lat": 25.1363, "lng": 121.5063,
+        "description": "全球最美公立圖書館之一，與公園生態共生的木造綠建築。",
+        "data": {"pm25": 8, "noise": 30, "green": 95, "art": 70, "sport": 10}
+    },
+    {
+        "id": 902, "name": "法鼓山農禪寺", "district": "北投區",
+        "lat": 25.1257, "lng": 121.4984,
+        "description": "水月道場的空靈倒影，IG上最熱門的寧靜心靈場所。",
+        "data": {"pm25": 10, "noise": 20, "green": 60, "art": 80, "sport": 5}
+    },
+
+    # --- 松山區 ---
+    {
+        "id": 1001, "name": "台北田徑場", "district": "松山區",
+        "lat": 25.0489, "lng": 121.5517,
+        "description": "國際級標準運動場，市民揮灑汗水與能量的中心。",
+        "data": {"pm25": 30, "noise": 70, "green": 20, "art": 10, "sport": 95}
     }
 ]
 
@@ -207,7 +183,6 @@ user_points = 0
 # 2. 核心算法：將 OpenData 轉化為幸福指標
 # ==========================================
 def calculate_happiness_indices(loc_data):
-    # 根據簡報公式邏輯計算
     pm25_score = max(0, 100 - loc_data['pm25'] * 1.5)
     noise_score = max(0, 100 - loc_data['noise'] * 1.2)
     relaxation = (pm25_score + noise_score) / 2
@@ -264,7 +239,7 @@ def get_locations():
         processed_locations.append(loc_obj)
 
     processed_locations.sort(key=lambda x: x['match_score'], reverse=True)
-    return jsonify(processed_locations[:15])
+    return jsonify(processed_locations) # 回傳所有地點供篩選
 
 @app.route('/api/checkin', methods=['POST'])
 def checkin():
@@ -273,7 +248,7 @@ def checkin():
     points_earned = random.randint(30, 80)
     user_points += points_earned
     
-    # 簡報提到的：虛擬獎章系統
+    # 虛擬獎章系統
     new_badge = None
     if user_points >= 100 and user_points < 200:
         new_badge = "城市探索者"
@@ -308,7 +283,6 @@ HTML_TEMPLATE = """
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; overflow: hidden; }
         #map { height: 100%; width: 100%; z-index: 1; }
         
-        /* 心情按鈕樣式優化 */
         .mood-btn { transition: all 0.2s; }
         .mood-btn.active { 
             background-color: #3b82f6 !important; 
@@ -318,11 +292,9 @@ HTML_TEMPLATE = """
         }
         .mood-btn.active i, .mood-btn.active span { color: white !important; }
 
-        /* 隱藏滾動條 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* 鈴鐺動畫 */
         @keyframes ring {
             0% { transform: rotate(0); }
             10% { transform: rotate(30deg); }
@@ -363,12 +335,12 @@ HTML_TEMPLATE = """
     <div class="flex flex-1 flex-col md:flex-row overflow-hidden relative">
         
         <!-- 地圖區域 -->
-        <div class="absolute inset-0 md:relative md:w-2/3 md:order-2 z-0">
+        <div id="map-container" class="absolute inset-0 md:relative md:w-2/3 md:order-2 z-0 transition-all duration-300 ease-in-out">
             <div id="map" class="h-full w-full"></div>
             
-            <!-- 熱力圖開關 -->
-            <button onclick="toggleHeatmap()" id="heatmap-btn" class="absolute top-4 right-4 z-[500] bg-white p-3 rounded-xl shadow-lg text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors">
-                <i class="fa-solid fa-fire-flame-curved text-xl"></i>
+            <!-- 側邊欄收合切換按鈕 (桌面版) -->
+            <button onclick="toggleSidebar()" class="hidden md:flex absolute top-1/2 left-0 transform -translate-y-1/2 z-[500] bg-white text-slate-500 hover:text-blue-600 p-2 rounded-r-lg shadow-md border border-l-0 border-gray-200 items-center justify-center transition-all hover:pl-3">
+                <i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left"></i>
             </button>
 
             <!-- 數據指標說明 (桌面版) -->
@@ -384,13 +356,13 @@ HTML_TEMPLATE = """
         </div>
 
         <!-- 側邊欄/底部抽屜 -->
-        <div class="absolute bottom-0 w-full md:relative md:w-1/3 md:order-1 md:h-full z-20 flex flex-col pointer-events-none md:pointer-events-auto">
-            <div class="bg-white rounded-t-3xl md:rounded-none shadow-[0_-8px_30px_rgba(0,0,0,0.12)] flex flex-col h-[55vh] md:h-full pointer-events-auto transition-all duration-300">
+        <div id="sidebar-panel" class="absolute bottom-0 w-full md:relative md:w-1/3 md:order-1 md:h-full z-20 flex flex-col pointer-events-none md:pointer-events-auto transition-all duration-300 ease-in-out origin-left">
+            <div class="bg-white rounded-t-3xl md:rounded-none shadow-[0_-8px_30px_rgba(0,0,0,0.12)] flex flex-col h-[55vh] md:h-full pointer-events-auto">
                 
                 <!-- 手機版把手 -->
                 <div class="w-full flex justify-center pt-3 pb-1 md:hidden"><div class="w-12 h-1.5 bg-gray-200 rounded-full"></div></div>
 
-                <!-- 1. 個人化心境匹配 (對應簡報) -->
+                <!-- 1. 個人化心境匹配 -->
                 <div class="p-5 border-b border-gray-100 bg-white shrink-0">
                     <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                         <i class="fa-solid fa-sliders"></i> 設定您的幸福動線
@@ -422,31 +394,23 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
-    <!-- 幸福響鈴任務達成 Modal (對應簡報) -->
+    <!-- 幸福響鈴任務達成 Modal -->
     <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 z-[2000] flex items-center justify-center p-6 backdrop-blur-sm transition-opacity opacity-0">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-8 text-center transform scale-90 transition-transform relative overflow-hidden">
-            <!-- 裝飾背景 -->
             <div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-yellow-50 to-white -z-10"></div>
-            
             <div class="relative mb-6">
                 <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto shadow-lg border-4 border-yellow-50">
                     <i id="bell-icon" class="fa-solid fa-bell text-5xl text-yellow-500"></i>
                 </div>
                 <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">TASK COMPLETED</div>
             </div>
-            
             <h3 class="text-2xl font-bold text-slate-800 mb-1">任務達成！</h3>
             <p id="modal-text" class="text-sm text-slate-500 mb-6">成功抵達探索地點</p>
-            
-            <!-- 獲得獎勵顯示 -->
             <div class="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-slate-500 text-xs font-bold uppercase">獲得積分</span>
-                    <span class="font-bold text-yellow-600 flex items-center gap-1 text-lg">
-                        +<span id="modal-points">0</span>
-                    </span>
+                    <span class="font-bold text-yellow-600 flex items-center gap-1 text-lg">+<span id="modal-points">0</span></span>
                 </div>
-                <!-- 虛擬獎章 (動態插入) -->
                 <div id="badge-notification" class="hidden pt-2 border-t border-slate-200 mt-2">
                     <div class="text-xs text-blue-500 font-bold mb-1">獲得新獎章！</div>
                     <div class="flex items-center justify-center gap-2 text-slate-700 font-bold">
@@ -454,10 +418,7 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
             </div>
-
-            <button onclick="closeModal()" class="w-full bg-slate-800 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-95 transition-all">
-                收下獎勵
-            </button>
+            <button onclick="closeModal()" class="w-full bg-slate-800 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-95 transition-all">收下獎勵</button>
         </div>
     </div>
 
@@ -484,14 +445,12 @@ HTML_TEMPLATE = """
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     
     <script>
         let map;
         let markers = [];
-        let heatLayer = null;
         let currentLocations = [];
-        let isHeatmapActive = false;
+        let isSidebarOpen = true; // 追蹤側邊欄狀態
 
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([25.06, 121.55], 12);
@@ -501,26 +460,36 @@ HTML_TEMPLATE = """
             fetchLocations('all');
         }
 
-        function changeMood(mood) { fetchLocations(mood); }
-
-        function toggleHeatmap() {
-            isHeatmapActive = !isHeatmapActive;
-            const btn = document.getElementById('heatmap-btn');
-            if (isHeatmapActive) {
-                btn.classList.add('text-red-500', 'bg-red-50');
-                drawHeatmap();
+        // 側邊欄收合切換功能
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar-panel');
+            const mapContainer = document.getElementById('map-container');
+            const icon = document.getElementById('sidebar-toggle-icon');
+            
+            isSidebarOpen = !isSidebarOpen;
+            
+            if (isSidebarOpen) {
+                // 打開側邊欄
+                sidebar.classList.remove('md:w-0', 'md:overflow-hidden', 'hidden');
+                sidebar.classList.add('md:w-1/3');
+                mapContainer.classList.remove('md:w-full');
+                mapContainer.classList.add('md:w-2/3');
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-left');
             } else {
-                btn.classList.remove('text-red-500', 'bg-red-50');
-                if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+                // 收起側邊欄
+                sidebar.classList.remove('md:w-1/3');
+                sidebar.classList.add('md:w-0', 'md:overflow-hidden', 'hidden'); 
+                mapContainer.classList.remove('md:w-2/3');
+                mapContainer.classList.add('md:w-full');
+                icon.classList.remove('fa-chevron-left');
+                icon.classList.add('fa-chevron-right');
             }
+            
+            setTimeout(() => { map.invalidateSize(); }, 300);
         }
 
-        function drawHeatmap() {
-            if (heatLayer) map.removeLayer(heatLayer);
-            if (!isHeatmapActive || currentLocations.length === 0) return;
-            const heatData = currentLocations.map(loc => [loc.lat, loc.lng, loc.match_score / 100]);
-            heatLayer = L.heatLayer(heatData, { radius: 35, blur: 20, maxZoom: 14, gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'} }).addTo(map);
-        }
+        function changeMood(mood) { fetchLocations(mood); }
 
         async function fetchLocations(mood) {
             document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('active'));
@@ -531,7 +500,6 @@ HTML_TEMPLATE = """
                 const res = await fetch(`/api/locations?mood=${mood}`);
                 currentLocations = await res.json();
                 updateUI();
-                if (isHeatmapActive) drawHeatmap();
             } catch(e) { console.error(e); }
         }
 
@@ -549,7 +517,6 @@ HTML_TEMPLATE = """
                     iconSize: [16, 16], iconAnchor: [8, 8]
                 });
                 
-                // 地點資訊卡 (對應簡報：科學依據可視化)
                 const popupContent = `
                     <div class="font-sans min-w-[200px] p-1">
                         <div class="flex justify-between items-center mb-2">
@@ -558,23 +525,17 @@ HTML_TEMPLATE = """
                         </div>
                         <h3 class="font-bold text-lg text-slate-800 mb-1 leading-tight">${loc.name}</h3>
                         <div class="text-xs text-slate-500 mb-3">${loc.tag}</div>
-                        
-                        <!-- 科學數據儀表板 -->
                         <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 mb-3 space-y-1.5">
                             <div class="flex items-center justify-between text-[10px] text-slate-500">
-                                <span>PM2.5</span>
-                                <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-blue-400" style="width:${100 - loc.data.pm25}%"></div></div>
+                                <span>PM2.5</span> <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-blue-400" style="width:${100 - loc.data.pm25}%"></div></div>
                             </div>
                             <div class="flex items-center justify-between text-[10px] text-slate-500">
-                                <span>綠覆率</span>
-                                <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-green-500" style="width:${loc.data.green}%"></div></div>
+                                <span>綠覆率</span> <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-green-500" style="width:${loc.data.green}%"></div></div>
                             </div>
                              <div class="flex items-center justify-between text-[10px] text-slate-500">
-                                <span>藝文</span>
-                                <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-purple-500" style="width:${loc.data.art}%"></div></div>
+                                <span>藝文</span> <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-purple-500" style="width:${loc.data.art}%"></div></div>
                             </div>
                         </div>
-
                         <div class="grid grid-cols-2 gap-2">
                             <a href="https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}" target="_blank" class="text-center bg-white border border-slate-200 text-slate-600 text-xs py-2 rounded-lg font-bold hover:bg-slate-50">導航</a>
                             <button onclick="checkIn('${loc.name}')" class="bg-blue-600 text-white text-xs py-2 rounded-lg font-bold hover:bg-blue-700 shadow-sm shadow-blue-200">打卡任務</button>
@@ -585,7 +546,6 @@ HTML_TEMPLATE = """
                 const marker = L.marker([loc.lat, loc.lng], {icon: markerIcon}).addTo(map).bindPopup(popupContent);
                 markers.push(marker);
 
-                // 列表卡片
                 const card = document.createElement('div');
                 card.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md hover:border-blue-100";
                 card.innerHTML = `
@@ -623,13 +583,10 @@ HTML_TEMPLATE = """
                     body: JSON.stringify({ locationName: name })
                 });
                 const data = await res.json();
-                
-                // 更新 UI
                 document.getElementById('user-points').innerText = data.total_points;
                 document.getElementById('modal-points').innerText = data.earned;
                 document.getElementById('modal-text').innerText = `成功探索 ${name}`;
                 
-                // 獎章邏輯
                 const badgeNotif = document.getElementById('badge-notification');
                 if(data.new_badge) {
                     badgeNotif.classList.remove('hidden');
@@ -639,14 +596,12 @@ HTML_TEMPLATE = """
                     badgeNotif.classList.add('hidden');
                 }
 
-                // 顯示 Modal 與鈴鐺動畫
                 const modal = document.getElementById('modal');
                 const bell = document.getElementById('bell-icon');
                 modal.classList.remove('hidden');
                 setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-90'); modal.querySelector('div').classList.add('scale-100'); }, 10);
                 bell.classList.add('bell-animation');
                 setTimeout(() => bell.classList.remove('bell-animation'), 1000);
-
             } catch(e) {}
         }
 
@@ -668,8 +623,3 @@ HTML_TEMPLATE = """
     </script>
 </body>
 </html>
-"""
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
