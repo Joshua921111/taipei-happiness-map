@@ -4,10 +4,8 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (200+ 地點修復版)
+# 1. 模擬 OpenData 數據庫 (200+ 地點完整版)
 # ==========================================
-# 屬性權重：PM2.5(低優), 噪音(低優), 綠覆(高優), 藝文(高優), 運動(高優)
-
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
     {"id":1, "name":"華山1914文創園區", "district":"中正區", "lat":25.0441, "lng":121.5293, "tag":"藝文", "description":"文青必訪的展演基地，匯集設計展、快閃店與草地野餐。", "data":{"pm25":30,"noise":65,"green":30,"art":100,"sport":10}},
@@ -164,7 +162,8 @@ for i in range(len(LOCATIONS)+1, 201):
     lng = coords[1] + random.uniform(-0.02, 0.02)
     tag = "療癒" if is_park else "放鬆"
     data = {"pm25":random.randint(10,40), "noise":random.randint(30,60), "green":random.randint(50,90) if is_park else random.randint(10,40), "art":random.randint(10,50), "sport":random.randint(20,60)}
-    LOCATIONS.append({"id":i, "name":name, "district":dist_name, "lat":lat, "lng":lng, "tag":tag, "data":data, "description":"位於城市角落的隱藏版好去處，適合想要暫時遠離喧囂的你。"})
+    desc = "位於城市角落的隱藏版好去處，適合想要暫時遠離喧囂的你，享受片刻的寧靜時光。" if is_park else "溫馨舒適的小角落，提供美味的餐點與飲品，是放鬆身心的絕佳選擇。"
+    LOCATIONS.append({"id":i, "name":name, "district":dist_name, "lat":lat, "lng":lng, "tag":tag, "data":data, "description":desc})
 
 WEATHER_TYPES = [{"icon":"fa-sun","text":"晴朗","color":"text-orange-500","temp":"28°C"},{"icon":"fa-cloud-sun","text":"多雲","color":"text-yellow-500","temp":"24°C"},{"icon":"fa-wind","text":"微風","color":"text-blue-400","temp":"22°C"}]
 user_points = 0
