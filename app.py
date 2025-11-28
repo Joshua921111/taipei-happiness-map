@@ -1,12 +1,10 @@
-import json
-import random
-import os
+import json, random, os
 from flask import Flask, render_template_string, jsonify, request
 
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (緊湊版)
+# 1. 模擬數據庫 (完整版)
 # ==========================================
 LOCATIONS = [
     {"id":101, "name":"中正紀念堂", "district":"中正區", "lat":25.0348, "lng":121.5217, "description":"藍白建築與廣闊廣場，國際級展覽與藝文活動的首選展場。", "data":{"pm25":25, "noise":55, "green":60, "art":98, "sport":40}},
@@ -14,7 +12,7 @@ LOCATIONS = [
     {"id":103, "name":"榕錦時光生活園區", "district":"中正區", "lat":25.0322, "lng":121.5265, "description":"原臺北刑務所官舍修復，日式老宅氛圍的IG熱門打卡點。", "data":{"pm25":20, "noise":45, "green":50, "art":85, "sport":5}},
     {"id":104, "name":"寶藏巖國際藝術村", "district":"中正區", "lat":25.0105, "lng":121.5323, "description":"依山而建的歷史聚落，共生藝術與獨特地景的探索秘境。", "data":{"pm25":15, "noise":30, "green":80, "art":95, "sport":30}},
     {"id":201, "name":"大安森林公園", "district":"大安區", "lat":25.0300, "lng":121.5358, "description":"城市之肺，適合野餐、慢跑與欣賞露天音樂表演。", "data":{"pm25":18, "noise":45, "green":100, "art":40, "sport":60}},
-    {"id":202, "name":"忠泰美術館", "district":"大安區", "lat":25.0435, "lng":121.5372, "description":"專注於「未來」與「城市」議題的精品美術館展場。", "data":{"pm25":20, "noise":50, "green":20, "art":95, "sport":0}},
+    {"id":202, "name":"忠泰美術館", "district":"大安區", "lat":25.0435, "lng":121.5372, "description":"專注於「未來」與「城市」議題的精品美術館展場。", "data":{"pm25":20, "noise":50, "green":10, "art":95, "sport":0}},
     {"id":301, "name":"松山文創園區", "district":"信義區", "lat":25.0439, "lng":121.5606, "description":"菸廠古蹟活化，結合誠品書店與設計展演的文化園區。", "data":{"pm25":22, "noise":55, "green":50, "art":95, "sport":20}},
     {"id":302, "name":"四四南村", "district":"信義區", "lat":25.0312, "lng":121.5620, "description":"信義區中的眷村記憶，週末簡單市集與藝文展演空間。", "data":{"pm25":25, "noise":50, "green":30, "art":85, "sport":10}},
     {"id":303, "name":"象山六巨石", "district":"信義區", "lat":25.0267, "lng":121.5746, "description":"社群媒體上最熱門的台北夜景拍攝點，揮灑汗水的絕佳步道。", "data":{"pm25":10, "noise":30, "green":90, "art":10, "sport":90}},
@@ -64,10 +62,7 @@ def get_locations():
         indices = calculate_happiness_indices(loc['data'])
         scores = {'vitality': indices['vitality'], 'healing': indices['healing'], 'energy': indices['energy'], 'relaxation': indices['relaxation']}
         dominant_attr = max(scores, key=scores.get)
-        
-        match_score = 0
-        tag = ""
-        marker_color = "#3b82f6"
+        match_score, tag, marker_color = 0, "", "#3b82f6"
 
         if mood == 'relax':
             match_score = indices['relaxation']; tag = "☁️ 極致放鬆"; marker_color = "#3b82f6"
@@ -104,7 +99,7 @@ def checkin():
     return jsonify({"status": "success", "message": f"抵達「{data.get('locationName')}」", "earned": 50, "total_points": user_points, "new_badge": new_badge})
 
 # ==========================================
-# 2. 前端介面
+# 4. 前端 HTML 模板
 # ==========================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -160,10 +155,10 @@ HTML_TEMPLATE = """
                 <div class="w-full flex justify-center pt-3 pb-1 md:hidden"><div class="w-12 h-1.5 bg-gray-200 rounded-full"></div></div>
                 <div class="p-5 border-b border-gray-100 bg-white shrink-0">
                     <div class="grid grid-cols-4 gap-3">
-                        <button onclick="changeMood('relax')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100"><i class="fa-solid fa-wind text-xl text-blue-400"></i><span class="text-xs font-bold">放鬆</span></button>
-                        <button onclick="changeMood('heal')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100"><i class="fa-solid fa-tree text-xl text-green-500"></i><span class="text-xs font-bold">療癒</span></button>
-                        <button onclick="changeMood('vitality')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100"><i class="fa-solid fa-palette text-xl text-purple-500"></i><span class="text-xs font-bold">藝文</span></button>
-                        <button onclick="changeMood('sport')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100"><i class="fa-solid fa-person-running text-xl text-red-500"></i><span class="text-xs font-bold">運動</span></button>
+                        <button id="btn-relax" onclick="changeMood('relax')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100"><i class="fa-solid fa-wind text-xl text-blue-400"></i><span class="text-xs font-bold">放鬆</span></button>
+                        <button id="btn-heal" onclick="changeMood('heal')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100"><i class="fa-solid fa-tree text-xl text-green-500"></i><span class="text-xs font-bold">療癒</span></button>
+                        <button id="btn-vitality" onclick="changeMood('vitality')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100"><i class="fa-solid fa-palette text-xl text-purple-500"></i><span class="text-xs font-bold">藝文</span></button>
+                        <button id="btn-sport" onclick="changeMood('sport')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100"><i class="fa-solid fa-person-running text-xl text-red-500"></i><span class="text-xs font-bold">運動</span></button>
                     </div>
                 </div>
                 <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 no-scrollbar" id="location-list"></div>
@@ -210,13 +205,18 @@ HTML_TEMPLATE = """
             setTimeout(()=>map.invalidateSize(), 300);
         }
         function changeMood(m) { 
+            // 核心修正：開關邏輯
             if(currentMood === m) currentMood = 'all'; else currentMood = m;
             fetchLocations(currentMood); 
         }
         async function fetchLocations(m) {
+            // UI 更新：先移除所有 Active
             document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('active'));
-            const map={'relax':0,'heal':1,'vitality':2,'sport':3};
-            if(m!=='all' && map[m]!==undefined) document.querySelectorAll('.mood-btn')[map[m]].classList.add('active');
+            // 如果不是 'all'，才把該按鈕加亮
+            if(m !== 'all') {
+                const btn = document.getElementById('btn-' + m);
+                if(btn) btn.classList.add('active');
+            }
             try { const res=await fetch(`/api/locations?mood=${m}`); currentLocations=await res.json(); updateUI(); } catch(e){}
         }
         function updateUI() {
