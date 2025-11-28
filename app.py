@@ -214,7 +214,6 @@ def get_locations():
         match_score = 0
         tag = ""
         
-        # 個人化心境匹配
         if mood == 'relax':
             match_score = indices['relaxation']
             tag = "☁️ 極致放鬆"
@@ -239,7 +238,7 @@ def get_locations():
         processed_locations.append(loc_obj)
 
     processed_locations.sort(key=lambda x: x['match_score'], reverse=True)
-    return jsonify(processed_locations) # 回傳所有地點供篩選
+    return jsonify(processed_locations)
 
 @app.route('/api/checkin', methods=['POST'])
 def checkin():
@@ -248,7 +247,6 @@ def checkin():
     points_earned = random.randint(30, 80)
     user_points += points_earned
     
-    # 虛擬獎章系統
     new_badge = None
     if user_points >= 100 and user_points < 200:
         new_badge = "城市探索者"
@@ -365,7 +363,6 @@ HTML_TEMPLATE = """
 
                 <!-- 1. 個人化心境匹配 -->
                 <div class="p-5 border-b border-gray-100 bg-white shrink-0">
-                    <!-- 標題已移除 -->
                     <div class="grid grid-cols-4 gap-3">
                         <button onclick="changeMood('relax')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100">
                             <i class="fa-solid fa-wind text-xl text-blue-400"></i><span class="text-xs font-bold">放鬆</span>
@@ -516,33 +513,46 @@ HTML_TEMPLATE = """
                     iconSize: [16, 16], iconAnchor: [8, 8]
                 });
                 
+                // 資訊卡 (Popup) 
+                // 使用 min-w-[220px] 限制最小寬度，避免內容過窄
+                // 使用 flex-1 讓進度條自動填滿，避免溢出
                 const popupContent = `
-                    <div class="font-sans min-w-[200px] p-1">
+                    <div class="font-sans min-w-[220px] p-1">
                         <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wide">${loc.district}</span>
-                            <span class="text-xs font-bold ${loc.weather.color}"><i class="fa-solid ${loc.weather.icon}"></i> ${loc.weather.temp}</span>
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wide whitespace-nowrap">${loc.district}</span>
+                            <span class="text-xs font-bold ${loc.weather.color} whitespace-nowrap"><i class="fa-solid ${loc.weather.icon}"></i> ${loc.weather.temp}</span>
                         </div>
                         <h3 class="font-bold text-lg text-slate-800 mb-1 leading-tight">${loc.name}</h3>
                         <div class="text-xs text-slate-500 mb-3">${loc.tag}</div>
                         <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 mb-3 space-y-1.5">
-                            <div class="flex items-center justify-between text-[10px] text-slate-500">
-                                <span>PM2.5</span> <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-blue-400" style="width:${100 - loc.data.pm25}%"></div></div>
+                            <div class="flex items-center text-[10px] text-slate-500">
+                                <span class="w-10 whitespace-nowrap">PM2.5</span>
+                                <div class="flex-1 ml-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-blue-400" style="width:${100 - loc.data.pm25}%"></div>
+                                </div>
                             </div>
-                            <div class="flex items-center justify-between text-[10px] text-slate-500">
-                                <span>綠覆率</span> <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-green-500" style="width:${loc.data.green}%"></div></div>
+                            <div class="flex items-center text-[10px] text-slate-500">
+                                <span class="w-10 whitespace-nowrap">綠覆率</span>
+                                <div class="flex-1 ml-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-green-500" style="width:${loc.data.green}%"></div>
+                                </div>
                             </div>
-                             <div class="flex items-center justify-between text-[10px] text-slate-500">
-                                <span>藝文</span> <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-purple-500" style="width:${loc.data.art}%"></div></div>
+                             <div class="flex items-center text-[10px] text-slate-500">
+                                <span class="w-10 whitespace-nowrap">藝文</span>
+                                <div class="flex-1 ml-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-purple-500" style="width:${loc.data.art}%"></div>
+                                </div>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <a href="https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}" target="_blank" class="text-center bg-white border border-slate-200 text-slate-600 text-xs py-2 rounded-lg font-bold hover:bg-slate-50">導航</a>
-                            <button onclick="checkIn('${loc.name}')" class="bg-blue-600 text-white text-xs py-2 rounded-lg font-bold hover:bg-blue-700 shadow-sm shadow-blue-200">打卡任務</button>
+                            <a href="https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}" target="_blank" class="text-center bg-white border border-slate-200 text-slate-600 text-xs py-2 rounded-lg font-bold hover:bg-slate-50 whitespace-nowrap">導航</a>
+                            <button onclick="checkIn('${loc.name}')" class="bg-blue-600 text-white text-xs py-2 rounded-lg font-bold hover:bg-blue-700 shadow-sm shadow-blue-200 whitespace-nowrap">打卡任務</button>
                         </div>
                     </div>
                 `;
 
-                const marker = L.marker([loc.lat, loc.lng], {icon: markerIcon}).addTo(map).bindPopup(popupContent);
+                // 設定 maxWidth 與 autoPanPadding 防止溢出與貼邊
+                const marker = L.marker([loc.lat, loc.lng], {icon: markerIcon}).addTo(map).bindPopup(popupContent, { maxWidth: 260, minWidth: 220, autoPanPadding: [20, 20] });
                 markers.push(marker);
 
                 const card = document.createElement('div');
@@ -599,7 +609,6 @@ HTML_TEMPLATE = """
                 const bell = document.getElementById('bell-icon');
                 modal.classList.remove('hidden');
                 
-                // 播放音效
                 const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
                 audio.play();
 
@@ -614,18 +623,13 @@ HTML_TEMPLATE = """
             if(points >= 300) document.getElementById('badge-data').classList.remove('opacity-40');
         }
 
-        // 新增：響鈴音效功能
         function ringBell() {
             const bell = document.querySelector('#nav-bell i');
             bell.parentElement.classList.add('scale-90');
             setTimeout(() => bell.parentElement.classList.remove('scale-90'), 150);
-            
-            // 播放清脆的鈴聲 (使用免費音效庫)
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
             audio.volume = 0.5;
             audio.play().catch(e => console.log("Audio play failed:", e));
-            
-            // 加入搖動動畫
             bell.parentElement.classList.add('bell-animation');
             setTimeout(() => bell.parentElement.classList.remove('bell-animation'), 1000);
         }
