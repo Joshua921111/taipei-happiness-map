@@ -312,7 +312,8 @@ HTML_TEMPLATE = """
     <!-- 頂部導航欄 -->
     <nav class="bg-white shadow-sm z-50 px-4 py-3 flex justify-between items-center shrink-0 border-b border-gray-100">
         <div class="flex items-center gap-2">
-            <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-2 rounded-xl shadow-sm">
+            <!-- 鈴鐺按鈕：綁定點擊事件 -->
+            <div id="nav-bell" onclick="ringBell()" class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-2 rounded-xl shadow-sm cursor-pointer transition-transform active:scale-95">
                 <i class="fa-solid fa-bell text-sm"></i>
             </div>
             <div>
@@ -364,9 +365,7 @@ HTML_TEMPLATE = """
 
                 <!-- 1. 個人化心境匹配 -->
                 <div class="p-5 border-b border-gray-100 bg-white shrink-0">
-                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <i class="fa-solid fa-sliders"></i> 設定您的幸福動線
-                    </h2>
+                    <!-- 標題已移除 -->
                     <div class="grid grid-cols-4 gap-3">
                         <button onclick="changeMood('relax')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5 hover:bg-slate-100">
                             <i class="fa-solid fa-wind text-xl text-blue-400"></i><span class="text-xs font-bold">放鬆</span>
@@ -599,6 +598,11 @@ HTML_TEMPLATE = """
                 const modal = document.getElementById('modal');
                 const bell = document.getElementById('bell-icon');
                 modal.classList.remove('hidden');
+                
+                // 播放音效
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                audio.play();
+
                 setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-90'); modal.querySelector('div').classList.add('scale-100'); }, 10);
                 bell.classList.add('bell-animation');
                 setTimeout(() => bell.classList.remove('bell-animation'), 1000);
@@ -608,6 +612,22 @@ HTML_TEMPLATE = """
         function updateLocalBadges(points) {
             if(points >= 100) document.getElementById('badge-explorer').classList.remove('opacity-40');
             if(points >= 300) document.getElementById('badge-data').classList.remove('opacity-40');
+        }
+
+        // 新增：響鈴音效功能
+        function ringBell() {
+            const bell = document.querySelector('#nav-bell i');
+            bell.parentElement.classList.add('scale-90');
+            setTimeout(() => bell.parentElement.classList.remove('scale-90'), 150);
+            
+            // 播放清脆的鈴聲 (使用免費音效庫)
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log("Audio play failed:", e));
+            
+            // 加入搖動動畫
+            bell.parentElement.classList.add('bell-animation');
+            setTimeout(() => bell.parentElement.classList.remove('bell-animation'), 1000);
         }
 
         function closeModal() {
@@ -623,8 +643,3 @@ HTML_TEMPLATE = """
     </script>
 </body>
 </html>
-"""
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
