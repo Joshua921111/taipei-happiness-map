@@ -1,109 +1,3 @@
-import json
-import random
-import os
-from flask import Flask, render_template_string, jsonify, request
-
-app = Flask(__name__)
-
-# ==========================================
-# 1. 數據庫與邏輯
-# ==========================================
-LOCATIONS = [
-    {"id":101, "name":"中正紀念堂", "district":"中正區", "lat":25.0348, "lng":121.5217, "description":"藍白建築與廣闊廣場，國際級展覽與藝文活動的首選展場。", "data":{"pm25":25, "noise":55, "green":60, "art":95, "sport":40}},
-    {"id":102, "name":"華山1914文創園區", "district":"中正區", "lat":25.0441, "lng":121.5293, "description":"文青必訪的展演基地，匯集設計展、快閃店與草地野餐。", "data":{"pm25":30, "noise":65, "green":30, "art":100, "sport":10}},
-    {"id":103, "name":"榕錦時光生活園區", "district":"中正區", "lat":25.0322, "lng":121.5265, "description":"原臺北刑務所官舍修復，日式老宅氛圍的IG熱門打卡點。", "data":{"pm25":20, "noise":45, "green":50, "art":85, "sport":5}},
-    {"id":104, "name":"寶藏巖國際藝術村", "district":"中正區", "lat":25.0105, "lng":121.5323, "description":"依山而建的歷史聚落，共生藝術與獨特地景的探索秘境。", "data":{"pm25":15, "noise":30, "green":80, "art":95, "sport":30}},
-    {"id":201, "name":"大安森林公園", "district":"大安區", "lat":25.0300, "lng":121.5358, "description":"城市之肺，適合野餐、慢跑與欣賞露天音樂表演。", "data":{"pm25":18, "noise":45, "green":100, "art":40, "sport":60}},
-    {"id":202, "name":"忠泰美術館", "district":"大安區", "lat":25.0435, "lng":121.5372, "description":"專注於「未來」與「城市」議題的精品美術館展場。", "data":{"pm25":20, "noise":50, "green":10, "art":95, "sport":0}},
-    {"id":301, "name":"松山文創園區", "district":"信義區", "lat":25.0439, "lng":121.5606, "description":"菸廠古蹟活化，結合誠品書店與設計展演的文化園區。", "data":{"pm25":22, "noise":55, "green":50, "art":95, "sport":20}},
-    {"id":302, "name":"四四南村", "district":"信義區", "lat":25.0312, "lng":121.5620, "description":"信義區中的眷村記憶，週末簡單市集與藝文展演空間。", "data":{"pm25":25, "noise":50, "green":30, "art":85, "sport":10}},
-    {"id":303, "name":"象山六巨石", "district":"信義區", "lat":25.0267, "lng":121.5746, "description":"社群媒體上最熱門的台北夜景拍攝點，揮灑汗水的絕佳步道。", "data":{"pm25":10, "noise":30, "green":90, "art":10, "sport":90}},
-    {"id":401, "name":"臺北市立美術館", "district":"中山區", "lat":25.0722, "lng":121.5246, "description":"臺灣首座現代美術館，純白建築與光影交織的藝術殿堂。", "data":{"pm25":20, "noise":40, "green":50, "art":100, "sport":10}},
-    {"id":402, "name":"心中山線形公園", "district":"中山區", "lat":25.0556, "lng":121.5205, "description":"串聯中山與雙連的綠色廊道，週末市集與年輕潮流聚集地。", "data":{"pm25":35, "noise":65, "green":70, "art":60, "sport":30}},
-    {"id":403, "name":"經國七海文化園區", "district":"中山區", "lat":25.0789, "lng":121.5332, "description":"結合古蹟、圖書館與劍潭湖美景的寧靜文化園區。", "data":{"pm25":15, "noise":30, "green":85, "art":70, "sport":20}},
-    {"id":501, "name":"臺北表演藝術中心", "district":"士林區", "lat":25.0847, "lng":121.5255, "description":"CNN評選全球最具變革性建築，國際級表演藝術場館。", "data":{"pm25":35, "noise":65, "green":10, "art":100, "sport":0}},
-    {"id":502, "name":"國立故宮博物院", "district":"士林區", "lat":25.1024, "lng":121.5485, "description":"世界級中華文化寶庫，歷史迷與外國遊客必訪展場。", "data":{"pm25":12, "noise":35, "green":80, "art":100, "sport":10}},
-    {"id":601, "name":"台北當代藝術館", "district":"大同區", "lat":25.0504, "lng":121.5186, "description":"日治時期小學校舍改建，前衛當代藝術的指標性展場。", "data":{"pm25":30, "noise":55, "green":10, "art":100, "sport":0}},
-    {"id":602, "name":"大稻埕碼頭", "district":"大同區", "lat":25.0567, "lng":121.5076, "description":"落日餘暉下的貨櫃市集，河畔騎車與小酌的放鬆聖地。", "data":{"pm25":25, "noise":60, "green":40, "art":50, "sport":70}},
-    {"id":701, "name":"剝皮寮歷史街區", "district":"萬華區", "lat":25.0369, "lng":121.5015, "description":"清代街道風貌保存最完整的區域，經常舉辦藝文特展。", "data":{"pm25":35, "noise":50, "green":10, "art":85, "sport":5}},
-    {"id":702, "name":"新富町文化市場", "district":"萬華區", "lat":25.0355, "lng":121.5021, "description":"馬蹄形古蹟市場變身文創基地，建築攝影愛好者必訪。", "data":{"pm25":30, "noise":45, "green":10, "art":80, "sport":0}},
-    {"id":801, "name":"臺北流行音樂中心", "district":"南港區", "lat":25.0519, "lng":121.5985, "description":"仿山巒起伏的指標建築，流行音樂展演與文化的最高殿堂。", "data":{"pm25":30, "noise":60, "green":40, "art":95, "sport":20}},
-    {"id":802, "name":"瓶蓋工廠台北製造所", "district":"南港區", "lat":25.0543, "lng":121.6001, "description":"老工廠翻新為職人手作基地，充滿工業風的展演空間。", "data":{"pm25":25, "noise":50, "green":30, "art":80, "sport":10}},
-    {"id":901, "name":"北投圖書館", "district":"北投區", "lat":25.1363, "lng":121.5063, "description":"全球最美公立圖書館之一，與公園生態共生的木造綠建築。", "data":{"pm25":8, "noise":30, "green":95, "art":70, "sport":10}},
-    {"id":902, "name":"法鼓山農禪寺", "district":"北投區", "lat":25.1257, "lng":121.4984, "description":"水月道場的空靈倒影，IG上最熱門的寧靜心靈場所。", "data":{"pm25":10, "noise":20, "green":60, "art":80, "sport":5}},
-    {"id":1001, "name":"台北田徑場", "district":"松山區", "lat":25.0489, "lng":121.5517, "description":"國際級標準運動場，市民揮灑汗水與能量的中心。", "data":{"pm25":30, "noise":70, "green":20, "art":10, "sport":95}}
-]
-
-WEATHER_TYPES = [
-    {"icon": "fa-sun", "text": "晴朗", "color": "text-orange-500", "temp": "28°C"},
-    {"icon": "fa-cloud-sun", "text": "多雲", "color": "text-yellow-500", "temp": "24°C"},
-    {"icon": "fa-wind", "text": "微風", "color": "text-blue-400", "temp": "22°C"}
-]
-
-user_points = 0
-
-def calculate_happiness_indices(loc_data):
-    pm25_score = max(0, 100 - loc_data['pm25'] * 1.5)
-    noise_score = max(0, 100 - loc_data['noise'] * 1.2)
-    relaxation = (pm25_score + noise_score) / 2
-    healing = loc_data['green']
-    vitality = min(100, (loc_data['art'] * 0.9 + loc_data['noise'] * 0.1))
-    energy = loc_data['sport']
-    return {"relaxation": round(relaxation, 1), "healing": round(healing, 1), "vitality": round(vitality, 1), "energy": round(energy, 1)}
-
-@app.route('/')
-def index():
-    return render_template_string(HTML_TEMPLATE)
-
-@app.route('/api/locations', methods=['GET'])
-def get_locations():
-    mood = request.args.get('mood', 'all')
-    processed_locations = []
-    
-    for loc in LOCATIONS:
-        indices = calculate_happiness_indices(loc['data'])
-        # 決定顏色
-        scores = {'vitality': indices['vitality'], 'healing': indices['healing'], 'energy': indices['energy'], 'relaxation': indices['relaxation']}
-        dominant_attr = max(scores, key=scores.get)
-        
-        match_score = 0
-        tag = ""
-        marker_color = "#3b82f6"
-
-        if mood == 'relax':
-            match_score = indices['relaxation']; tag = "☁️ 極致放鬆"; marker_color = "#3b82f6"
-        elif mood == 'heal':
-            match_score = indices['healing']; tag = "🌳 自然療癒"; marker_color = "#10b981"
-        elif mood == 'vitality':
-            match_score = indices['vitality']; tag = "🎨 藝文活力"; marker_color = "#a855f7"
-        elif mood == 'sport':
-            match_score = indices['energy']; tag = "🏃‍♂️ 揮灑汗水"; marker_color = "#ef4444"
-        else:
-            match_score = sum(scores.values()) / 4
-            if dominant_attr == 'vitality': tag = "🎨 藝文特區"; marker_color = "#a855f7"
-            elif dominant_attr == 'healing': tag = "🌳 療癒綠洲"; marker_color = "#10b981"
-            elif dominant_attr == 'energy': tag = "🏃‍♂️ 運動熱點"; marker_color = "#ef4444"
-            else: tag = "☁️ 放鬆角落"; marker_color = "#3b82f6"
-
-        loc_obj = loc.copy()
-        loc_obj.update({'indices': indices, 'match_score': round(match_score, 1), 'tag': tag, 'weather': random.choice(WEATHER_TYPES), 'marker_color': marker_color})
-        processed_locations.append(loc_obj)
-
-    if mood == 'all': random.shuffle(processed_locations)
-    processed_locations.sort(key=lambda x: x['match_score'], reverse=True)
-    return jsonify(processed_locations)
-
-@app.route('/api/checkin', methods=['POST'])
-def checkin():
-    global user_points
-    data = request.json
-    user_points += random.randint(30, 80)
-    new_badge = None
-    if user_points >= 500: new_badge = "臺北幸福大使"
-    elif user_points >= 300: new_badge = "數據大師"
-    elif user_points >= 100: new_badge = "城市探索者"
-    return jsonify({"status": "success", "message": f"抵達「{data.get('locationName')}」", "earned": 50, "total_points": user_points, "new_badge": new_badge})
-
 # ==========================================
 # 2. 前端介面
 # ==========================================
@@ -197,7 +91,7 @@ HTML_TEMPLATE = """
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        let map, markers=[], currentLocations=[], isSidebarOpen=true;
+        let map, markers=[], currentLocations=[], isSidebarOpen=true, currentMood='all';
         function initMap() {
             map = L.map('map', {zoomControl:false}).setView([25.06, 121.55], 12);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {attribution:'OpenStreetMap', maxZoom:19}).addTo(map);
@@ -210,11 +104,14 @@ HTML_TEMPLATE = """
             else { sb.classList.remove('md:w-1/3'); sb.classList.add('md:w-0','hidden'); mc.classList.remove('md:w-2/3'); mc.classList.add('md:w-full'); icon.classList.replace('fa-chevron-left','fa-chevron-right'); }
             setTimeout(()=>map.invalidateSize(), 300);
         }
-        function changeMood(m) { fetchLocations(m); }
+        function changeMood(m) { 
+            if(currentMood === m) currentMood = 'all'; else currentMood = m;
+            fetchLocations(currentMood); 
+        }
         async function fetchLocations(m) {
             document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('active'));
             const map={'relax':0,'heal':1,'vitality':2,'sport':3};
-            if(map[m]!==undefined) document.querySelectorAll('.mood-btn')[map[m]].classList.add('active');
+            if(m!=='all' && map[m]!==undefined) document.querySelectorAll('.mood-btn')[map[m]].classList.add('active');
             try { const res=await fetch(`/api/locations?mood=${m}`); currentLocations=await res.json(); updateUI(); } catch(e){}
         }
         function updateUI() {
