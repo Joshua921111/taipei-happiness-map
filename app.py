@@ -4,7 +4,7 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版)
+# 1. 模擬 OpenData 數據庫
 # ==========================================
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
@@ -185,22 +185,47 @@ def get_locations():
         idx = calculate_happiness_indices(loc['data'])
         scores = {'vitality':idx['vitality'], 'healing':idx['healing'], 'energy':idx['energy'], 'relaxation':idx['relaxation']}
         dom = max(scores, key=scores.get)
-        ms, tag, color = 0, "", "#3b82f6"
-        
-        if mood=='relax': ms=idx['relaxation']; tag="☁️ 極致放鬆"; color="#3b82f6"
-        elif mood=='heal': ms=idx['healing']; tag="🌳 自然療癒"; color="#10b981"
-        elif mood=='vitality': ms=idx['vitality']; tag="🎨 藝文活力"; color="#a855f7"
-        elif mood=='sport': ms=idx['energy']; tag="🏃‍♂️ 揮灑汗水"; color="#ef4444"
+        match_score = 0
+        tag = ""
+        # 改為溫暖的橘色，避免與藍色定位點混淆
+        marker_color = "#f97316" 
+
+        if mood == 'relax':
+            match_score = indices['relaxation']
+            tag = "☁️ 極致放鬆"
+            marker_color = "#f97316" # Orange for Relax
+        elif mood == 'heal':
+            match_score = indices['healing']
+            tag = "🌳 自然療癒"
+            marker_color = "#10b981" # Green
+        elif mood == 'vitality':
+            match_score = indices['vitality']
+            tag = "🎨 藝文活力"
+            marker_color = "#a855f7" # Purple
+        elif mood == 'sport':
+            match_score = indices['energy']
+            tag = "🏃‍♂️ 揮灑汗水"
+            marker_color = "#ef4444" # Red
         else:
-            ms=sum(scores.values())/4
-            if dom=='vitality': tag="🎨 藝文特區"; color="#a855f7"
-            elif dom=='healing': tag="🌳 療癒綠洲"; color="#10b981"
-            elif dom=='energy': tag="🏃‍♂️ 運動熱點"; color="#ef4444"
-            else: tag="☁️ 放鬆角落"; color="#3b82f6"
-            
-        l=loc.copy(); l.update({'indices':idx, 'match_score':round(ms,1), 'tag':tag, 'weather':random.choice(WEATHER_TYPES), 'marker_color':color})
-        res.append(l)
-    if mood=='all': random.shuffle(res)
+            match_score = sum(scores.values()) / 4
+            if dom=='vitality': 
+                tag = "🎨 藝文特區"
+                marker_color = "#a855f7"
+            elif dom=='healing': 
+                tag = "🌳 療癒綠洲"
+                marker_color = "#10b981"
+            elif dom=='energy': 
+                tag = "🏃‍♂️ 運動熱點"
+                marker_color = "#ef4444"
+            else: 
+                tag = "☁️ 放鬆角落"
+                marker_color = "#f97316" # Orange
+
+        loc_obj = loc.copy()
+        loc_obj.update({'indices': indices, 'match_score': round(match_score, 1), 'tag': tag, 'weather': random.choice(WEATHER_TYPES), 'marker_color': marker_color})
+        res.append(loc_obj)
+
+    if mood == 'all': random.shuffle(res)
     res.sort(key=lambda x:x['match_score'], reverse=True)
     return jsonify(res)
 
@@ -220,7 +245,14 @@ def checkin():
 HTML_TEMPLATE = """
 <!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><title>臺北市幸福鈴</title>
 <script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
-<style>body{font-family:sans-serif;background:#f8fafc;overflow:hidden} #map{height:100%;width:100%;z-index:1} .mood-btn{transition:all 0.2s} .mood-btn.active{background-color:#3b82f6!important;color:white!important;border-color:#3b82f6!important} .mood-btn.active i,.mood-btn.active span{color:white!important} .no-scrollbar::-webkit-scrollbar{display:none} @keyframes ring{0%,100%{transform:rotate(0)}10%,90%{transform:rotate(30deg)}30%,70%{transform:rotate(-30deg)}50%{transform:rotate(30deg)}} .bell-animation{animation:ring 1s ease-in-out} .user-loc {animation: pulse-ring 2s infinite;} @keyframes pulse-ring {0% {box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);} 70% {box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);} 100% {box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);}}</style></head>
+<style>body{font-family:sans-serif;background:#f8fafc;overflow:hidden} #map{height:100%;width:100%;z-index:1} .mood-btn{transition:all 0.2s} 
+/* 更新按鈕顏色對應 */
+#btn-relax.active { background-color: #f97316 !important; border-color: #f97316 !important; color: white !important; }
+#btn-heal.active { background-color: #10b981 !important; border-color: #10b981 !important; color: white !important; }
+#btn-vitality.active { background-color: #a855f7 !important; border-color: #a855f7 !important; color: white !important; }
+#btn-sport.active { background-color: #ef4444 !important; border-color: #ef4444 !important; color: white !important; }
+.mood-btn.active i,.mood-btn.active span{color:white!important} 
+.no-scrollbar::-webkit-scrollbar{display:none} @keyframes ring{0%,100%{transform:rotate(0)}10%,90%{transform:rotate(30deg)}30%,70%{transform:rotate(-30deg)}50%{transform:rotate(30deg)}} .bell-animation{animation:ring 1s ease-in-out} .user-loc {animation: pulse-ring 2s infinite;} @keyframes pulse-ring {0% {box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);} 70% {box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);} 100% {box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);}}</style></head>
 <body class="flex flex-col h-screen text-slate-800">
 <nav class="bg-white shadow-sm z-50 px-4 py-3 flex justify-between items-center shrink-0 border-b border-gray-100">
 <div class="flex items-center gap-2"><div id="nav-bell" onclick="ringBell()" class="bg-blue-500 text-white p-2 rounded-xl shadow-sm cursor-pointer active:scale-95"><i class="fa-solid fa-bell text-sm"></i></div><div><h1 class="text-lg font-bold">幸福地圖</h1><div class="text-[10px] text-slate-500">Taipei Happiness Bell</div></div></div>
@@ -234,18 +266,18 @@ HTML_TEMPLATE = """
 <button onclick="getLocation()" class="absolute top-4 left-4 md:top-16 z-[500] bg-white text-slate-500 hover:text-blue-600 p-2 rounded shadow-md w-10 h-10 items-center justify-center transition-all active:scale-95" title="我的位置"><i class="fa-solid fa-crosshairs"></i></button>
 <!-- 手機版說明書按鈕改到右上角 -->
 <button onclick="showGuide()" class="absolute top-20 right-4 md:bottom-8 md:right-4 z-[500] bg-white text-slate-600 p-3 rounded-full shadow-lg hover:text-blue-600 active:scale-95"><i class="fa-solid fa-book-open text-xl"></i></button>
-<div class="hidden md:block absolute bottom-8 left-8 bg-white/95 p-4 rounded-xl shadow-xl z-[500] text-xs backdrop-blur-sm border border-gray-100"><div class="font-bold mb-3 text-slate-700">地圖顏色說明</div><div class="space-y-2"><div class="flex items-center gap-2"><div class="w-3 h-3 bg-purple-500 rounded-full"></div><span>藝文特區</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full"></div><span>療癒綠洲</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span>運動熱點</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-blue-500 rounded-full"></div><span>放鬆角落</span></div></div></div></div>
+<div class="hidden md:block absolute bottom-8 left-8 bg-white/95 p-4 rounded-xl shadow-xl z-[500] text-xs backdrop-blur-sm border border-gray-100"><div class="font-bold mb-3 text-slate-700">地圖顏色說明</div><div class="space-y-2"><div class="flex items-center gap-2"><div class="w-3 h-3 bg-purple-500 rounded-full"></div><span>藝文特區</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full"></div><span>療癒綠洲</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span>運動熱點</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-orange-500 rounded-full"></div><span>放鬆角落</span></div></div></div></div>
 <div id="sidebar-panel" class="absolute bottom-0 w-full md:relative md:w-1/3 md:order-1 md:h-full z-20 flex flex-col pointer-events-none md:pointer-events-auto transition-all duration-300 ease-in-out origin-left"><div class="bg-white rounded-t-3xl md:rounded-none shadow-xl flex flex-col h-[55vh] md:h-full pointer-events-auto">
 <div class="w-full flex justify-center pt-3 pb-1 md:hidden"><div class="w-12 h-1.5 bg-gray-200 rounded-full cursor-grab active:cursor-grabbing" onclick="toggleSidebarMobile()"></div></div>
 <div class="p-5 border-b border-gray-100 bg-white shrink-0"><div class="grid grid-cols-4 gap-3">
-<button id="btn-relax" onclick="changeMood('relax')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-wind text-xl text-blue-400"></i><span class="text-xs font-bold">放鬆</span></button>
+<button id="btn-relax" onclick="changeMood('relax')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-wind text-xl text-orange-400"></i><span class="text-xs font-bold">放鬆</span></button>
 <button id="btn-heal" onclick="changeMood('heal')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-tree text-xl text-green-500"></i><span class="text-xs font-bold">療癒</span></button>
 <button id="btn-vitality" onclick="changeMood('vitality')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-palette text-xl text-purple-500"></i><span class="text-xs font-bold">藝文</span></button>
 <button id="btn-sport" onclick="changeMood('sport')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-person-running text-xl text-red-500"></i><span class="text-xs font-bold">運動</span></button>
 </div></div><div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 no-scrollbar" id="location-list"></div></div></div></div>
 <div id="guide-modal" class="hidden fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm" onclick="hideModal('guide-modal',event)"><div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative overflow-hidden" onclick="event.stopPropagation()"><div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-500 to-blue-600 -z-10"></div><div class="flex justify-between items-center mb-6 text-white relative z-10"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-book-open"></i> 使用指南</h3><button onclick="document.getElementById('guide-modal').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button></div><div class="space-y-6 max-h-[60vh] overflow-y-auto pr-2 no-scrollbar">
 <div><h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fa-solid fa-chart-pie text-blue-500"></i> 幸福契合度 (左側數字)</h4><p class="text-sm text-slate-600 bg-blue-50 p-3 rounded-xl">卡片左側的圓形數字代表該地點與您當前選擇心情的<b>「契合百分比」</b> (0-100分)。<br>分數越高，代表該地點的環境數據 (如空氣、綠地、噪音) 越符合您的需求。</p></div>
-<div><h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fa-solid fa-palette text-purple-500"></i> 顏色代表</h4><div class="grid grid-cols-2 gap-3 text-sm"><div class="flex items-center gap-2 bg-purple-50 p-2 rounded-lg"><div class="w-3 h-3 bg-purple-500 rounded-full"></div>藝文特區</div><div class="flex items-center gap-2 bg-green-50 p-2 rounded-lg"><div class="w-3 h-3 bg-green-500 rounded-full"></div>療癒綠洲</div><div class="flex items-center gap-2 bg-red-50 p-2 rounded-lg"><div class="w-3 h-3 bg-red-500 rounded-full"></div>運動熱點</div><div class="flex items-center gap-2 bg-blue-50 p-2 rounded-lg"><div class="w-3 h-3 bg-blue-500 rounded-full"></div>放鬆角落</div></div></div></div><button onclick="document.getElementById('guide-modal').classList.add('hidden')" class="mt-6 w-full py-3 bg-slate-100 rounded-xl font-bold text-slate-600">我瞭解了</button></div></div>
+<div><h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fa-solid fa-palette text-purple-500"></i> 顏色代表</h4><div class="grid grid-cols-2 gap-3 text-sm"><div class="flex items-center gap-2 bg-purple-50 p-2 rounded-lg"><div class="w-3 h-3 bg-purple-500 rounded-full"></div>藝文特區</div><div class="flex items-center gap-2 bg-green-50 p-2 rounded-lg"><div class="w-3 h-3 bg-green-500 rounded-full"></div>療癒綠洲</div><div class="flex items-center gap-2 bg-red-50 p-2 rounded-lg"><div class="w-3 h-3 bg-red-500 rounded-full"></div>運動熱點</div><div class="flex items-center gap-2 bg-orange-50 p-2 rounded-lg"><div class="w-3 h-3 bg-orange-500 rounded-full"></div>放鬆角落</div></div></div></div><button onclick="document.getElementById('guide-modal').classList.add('hidden')" class="mt-6 w-full py-3 bg-slate-100 rounded-xl font-bold text-slate-600">我瞭解了</button></div></div>
 <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 z-[2000] flex items-center justify-center p-6 backdrop-blur-sm transition-opacity opacity-0"><div class="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-8 text-center transform scale-90 transition-transform relative overflow-hidden"><div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-yellow-50 to-white -z-10"></div><div class="relative mb-6"><div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto shadow-lg border-4 border-yellow-50"><i id="bell-icon" class="fa-solid fa-bell text-5xl text-yellow-500"></i></div><div class="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">TASK COMPLETED</div></div><h3 class="text-2xl font-bold text-slate-800 mb-1">任務達成！</h3><p id="modal-text" class="text-sm text-slate-500 mb-6">成功抵達探索地點</p><div class="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100"><div class="flex justify-between items-center mb-2"><span class="text-slate-500 text-xs font-bold uppercase">獲得積分</span><span class="font-bold text-yellow-600 flex items-center gap-1 text-lg">+<span id="modal-points">0</span></span></div>
 <div class="flex justify-between items-center mb-2"><span class="text-slate-500 text-xs font-bold uppercase">累積步數</span><span class="font-bold text-blue-600 flex items-center gap-1 text-lg"><i class="fa-solid fa-shoe-prints text-sm"></i> <span id="modal-steps">0</span></span></div>
 <div id="badge-notification" class="hidden pt-2 border-t border-slate-200 mt-2"><div class="text-xs text-blue-500 font-bold mb-1">獲得新獎章！</div><div class="flex items-center justify-center gap-2 text-slate-700 font-bold"><i class="fa-solid fa-medal text-blue-500"></i> <span id="badge-name"></span></div></div></div><button onclick="closeModal()" class="w-full bg-slate-800 text-white py-3.5 rounded-xl font-bold shadow-lg active:scale-95 transition-all">收下獎勵</button></div></div>
@@ -270,6 +302,7 @@ HTML_TEMPLATE = """
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         if(userLocationMarker) map.removeLayer(userLocationMarker);
+        // 使用者定位點保持藍色
         userLocationMarker = L.marker([lat, lng], {
             icon: L.divIcon({className:'user-loc', html:'<div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg pulse-ring"></div>', iconSize:[16,16]})
         }).addTo(map);
@@ -282,7 +315,6 @@ HTML_TEMPLATE = """
         else { sb.classList.remove('md:w-1/3'); sb.classList.add('md:w-0','hidden'); mc.classList.remove('md:w-2/3'); mc.classList.add('md:w-full'); icon.classList.replace('fa-chevron-left','fa-chevron-right'); }
         setTimeout(()=>map.invalidateSize(), 300);
     }
-    // 手機版側邊欄收合
     function toggleSidebarMobile() {
         const sb = document.getElementById('sidebar-panel');
         if (sb.classList.contains('h-[55vh]')) {
@@ -321,7 +353,10 @@ HTML_TEMPLATE = """
             const card = document.createElement('div');
             card.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md hover:border-blue-100";
             let tagBg="bg-slate-100 text-slate-500";
-            if(loc.tag.includes("藝文")) tagBg="bg-purple-100 text-purple-600"; else if(loc.tag.includes("療癒")) tagBg="bg-green-100 text-green-600"; else if(loc.tag.includes("運動")) tagBg="bg-red-100 text-red-600"; else if(loc.tag.includes("放鬆")) tagBg="bg-blue-100 text-blue-600";
+            if(loc.tag.includes("藝文")) tagBg="bg-purple-100 text-purple-600"; 
+            else if(loc.tag.includes("療癒")) tagBg="bg-green-100 text-green-600"; 
+            else if(loc.tag.includes("運動")) tagBg="bg-red-100 text-red-600"; 
+            else if(loc.tag.includes("放鬆")) tagBg="bg-orange-100 text-orange-600"; // 放鬆標籤改為橘色
             card.innerHTML = `<div class="flex gap-4"><div class="flex-shrink-0 w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-white font-bold shadow-sm" style="background-color:${loc.marker_color}"><span class="text-lg leading-none">${Math.round(loc.match_score)}</span><span class="text-[9px] opacity-80">分</span></div><div class="flex-1 min-w-0"><div class="flex justify-between items-start mb-1"><h4 class="font-bold text-slate-800 truncate text-base">${loc.name}</h4><span class="text-[10px] px-2 py-0.5 rounded-full ${tagBg}">${loc.tag}</span></div><p class="text-xs text-slate-500 line-clamp-2 mb-2">${loc.description}</p><div class="flex items-center gap-2 text-[10px] text-slate-400"><span class="${loc.weather.color} font-bold"><i class="fa-solid ${loc.weather.icon}"></i> ${loc.weather.temp}</span><span>•</span><span>${loc.district}</span></div></div></div>`;
             card.onclick = () => { map.flyTo([loc.lat, loc.lng], 16, {duration:1.2}); setTimeout(()=>m.openPopup(), 1200); };
             list.appendChild(card);
