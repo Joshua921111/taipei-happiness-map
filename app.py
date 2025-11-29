@@ -4,7 +4,7 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版)
+# 1. 模擬 OpenData 數據庫 (200+ 地點完整版)
 # ==========================================
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
@@ -240,7 +240,7 @@ HTML_TEMPLATE = """
 <button onclick="toggleSidebar()" class="hidden md:flex absolute top-4 left-4 z-[500] bg-white text-slate-500 hover:text-blue-600 p-2 rounded shadow-md w-10 h-10 items-center justify-center transition-all"><i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left"></i></button>
 <button onclick="getLocation()" class="absolute top-4 left-4 md:top-16 z-[500] bg-white text-slate-500 hover:text-blue-600 p-2 rounded shadow-md w-10 h-10 items-center justify-center transition-all active:scale-95" title="我的位置"><i class="fa-solid fa-crosshairs"></i></button>
 <!-- 手機版說明書按鈕改到右上角 -->
-<button onclick="showGuide()" class="absolute top-20 right-4 md:bottom-8 md:right-4 z-[500] bg-white text-slate-600 p-3 rounded-full shadow-lg hover:text-blue-600 active:scale-95"><i class="fa-solid fa-book-open text-xl"></i></button>
+<button onclick="showGuide()" class="absolute top-20 right-4 md:top-auto md:bottom-8 md:right-4 z-[500] bg-white text-slate-600 p-2 rounded shadow-md w-10 h-10 flex items-center justify-center transition-all active:scale-95 hover:text-blue-600"><i class="fa-solid fa-book-open text-lg"></i></button>
 <div class="hidden md:block absolute bottom-8 left-8 bg-white/95 p-4 rounded-xl shadow-xl z-[500] text-xs backdrop-blur-sm border border-gray-100"><div class="font-bold mb-3 text-slate-700">地圖顏色說明</div><div class="space-y-2"><div class="flex items-center gap-2"><div class="w-3 h-3 bg-purple-500 rounded-full"></div><span>藝文特區</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full"></div><span>療癒綠洲</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span>運動熱點</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-orange-500 rounded-full"></div><span>放鬆角落</span></div></div></div></div>
 <div id="sidebar-panel" class="absolute bottom-0 w-full md:relative md:w-1/3 md:order-1 md:h-full z-20 flex flex-col pointer-events-none md:pointer-events-auto transition-all duration-300 ease-in-out origin-left"><div class="bg-white rounded-t-3xl md:rounded-none shadow-xl flex flex-col h-[55vh] md:h-full pointer-events-auto">
 <div class="w-full flex justify-center pt-3 pb-1 md:hidden"><div class="w-12 h-1.5 bg-gray-200 rounded-full cursor-grab active:cursor-grabbing" onclick="toggleSidebarMobile()"></div></div>
@@ -369,7 +369,8 @@ HTML_TEMPLATE = """
     function showBadges() { document.getElementById('badge-modal').classList.remove('hidden'); }
     function hideModal(id, e) { if(e.target.id===id) document.getElementById(id).classList.add('hidden'); }
     window.onload = initMap;
-</script></body></html>"""
+</script></body></html>
+"""
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
