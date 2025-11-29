@@ -4,10 +4,8 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版)
+# 1. 模擬 OpenData 數據庫 (200+ 地點完整版)
 # ==========================================
-# 屬性權重：PM2.5(低優), 噪音(低優), 綠覆(高優), 藝文(高優), 運動(高優)
-
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
     {"id":1, "name":"華山1914文創園區", "district":"中正區", "lat":25.0441, "lng":121.5293, "tag":"藝文", "description":"文青必訪的展演基地，匯集設計展、快閃店與草地野餐。", "data":{"pm25":30,"noise":65,"green":30,"art":100,"sport":10}},
