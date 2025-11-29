@@ -4,8 +4,10 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (200+ 地點完整版)
+# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版)
 # ==========================================
+# 屬性權重：PM2.5(低優), 噪音(低優), 綠覆(高優), 藝文(高優), 運動(高優)
+
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
     {"id":1, "name":"華山1914文創園區", "district":"中正區", "lat":25.0441, "lng":121.5293, "tag":"藝文", "description":"文青必訪的展演基地，匯集設計展、快閃店與草地野餐。", "data":{"pm25":30,"noise":65,"green":30,"art":100,"sport":10}},
@@ -222,6 +224,7 @@ HTML_TEMPLATE = """
 <div class="flex flex-1 flex-col md:flex-row overflow-hidden relative">
 <div id="map-container" class="absolute inset-0 md:relative md:w-2/3 md:order-2 z-0 transition-all duration-300 ease-in-out"><div id="map" class="h-full w-full"></div>
 <button onclick="toggleSidebar()" class="hidden md:flex absolute top-4 left-4 z-[500] bg-white text-slate-500 hover:text-blue-600 p-2 rounded shadow-md w-10 h-10 items-center justify-center transition-all"><i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left"></i></button>
+<button onclick="getLocation()" class="absolute top-16 left-4 z-[500] bg-white text-slate-500 hover:text-blue-600 p-2 rounded shadow-md w-10 h-10 items-center justify-center transition-all active:scale-95" title="我的位置"><i class="fa-solid fa-crosshairs"></i></button>
 <button onclick="showGuide()" class="absolute bottom-8 right-4 z-[500] bg-white text-slate-600 p-3 rounded-full shadow-lg hover:text-blue-600"><i class="fa-solid fa-book-open text-xl"></i></button>
 <div class="hidden md:block absolute bottom-8 left-8 bg-white/95 p-4 rounded-xl shadow-xl z-[500] text-xs backdrop-blur-sm border border-gray-100"><div class="font-bold mb-3 text-slate-700">地圖顏色說明</div><div class="space-y-2"><div class="flex items-center gap-2"><div class="w-3 h-3 bg-purple-500 rounded-full"></div><span>藝文特區</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full"></div><span>療癒綠洲</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span>運動熱點</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-blue-500 rounded-full"></div><span>放鬆角落</span></div></div></div></div>
 <div id="sidebar-panel" class="absolute bottom-0 w-full md:relative md:w-1/3 md:order-1 md:h-full z-20 flex flex-col pointer-events-none md:pointer-events-auto transition-all duration-300 ease-in-out origin-left"><div class="bg-white rounded-t-3xl md:rounded-none shadow-xl flex flex-col h-[55vh] md:h-full pointer-events-auto">
@@ -239,11 +242,27 @@ HTML_TEMPLATE = """
 <div id="badge-modal" class="hidden fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm" onclick="hideModal('badge-modal', event)"><div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl" onclick="event.stopPropagation()"><h3 class="font-bold text-lg mb-4 flex items-center gap-2"><i class="fa-solid fa-medal text-blue-500"></i> 我的成就獎章</h3><div class="grid grid-cols-3 gap-4 text-center"><div class="flex flex-col items-center gap-2 opacity-100"><div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500"><i class="fa-solid fa-user"></i></div><span class="text-xs font-bold text-slate-600">新手上路</span></div><div class="flex flex-col items-center gap-2 opacity-40" id="badge-explorer"><div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-500"><i class="fa-solid fa-compass"></i></div><span class="text-xs font-bold text-slate-600">城市探索者</span></div><div class="flex flex-col items-center gap-2 opacity-40" id="badge-data"><div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-500"><i class="fa-solid fa-chart-pie"></i></div><span class="text-xs font-bold text-slate-600">數據大師</span></div></div><button onclick="document.getElementById('badge-modal').classList.add('hidden')" class="mt-6 w-full py-2 bg-gray-100 rounded-lg text-sm font-bold text-gray-600">關閉</button></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let map, markers=[], currentLocations=[], isSidebarOpen=true, currentMood='all';
+    let map, markers=[], currentLocations=[], isSidebarOpen=true, currentMood='all', userLocationMarker=null;
     function initMap() {
         map = L.map('map', {zoomControl:false}).setView([25.06, 121.55], 12);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {attribution:'OpenStreetMap', maxZoom:19}).addTo(map);
         fetchLocations('all');
+        // 嘗試自動定位
+        getLocation();
+    }
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(showPosition, (e)=>console.log(e), {enableHighAccuracy:true});
+        }
+    }
+    function showPosition(position) {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        if(userLocationMarker) map.removeLayer(userLocationMarker);
+        userLocationMarker = L.marker([lat, lng], {
+            icon: L.divIcon({className:'user-loc', html:'<div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg pulse-ring"></div>', iconSize:[16,16]})
+        }).addTo(map);
+        map.flyTo([lat, lng], 15);
     }
     function toggleSidebar() {
         const sb=document.getElementById('sidebar-panel'), mc=document.getElementById('map-container'), icon=document.getElementById('sidebar-toggle-icon');
@@ -314,7 +333,8 @@ HTML_TEMPLATE = """
     function showBadges() { document.getElementById('badge-modal').classList.remove('hidden'); }
     function hideModal(id, e) { if(e.target.id===id) document.getElementById(id).classList.add('hidden'); }
     window.onload = initMap;
-</script></body></html>"""
+</script></body></html>
+"""
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
