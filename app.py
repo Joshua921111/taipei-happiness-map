@@ -4,8 +4,10 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (200+ 地點完整版)
+# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版)
 # ==========================================
+# 屬性權重：PM2.5(低優), 噪音(低優), 綠覆(高優), 藝文(高優), 運動(高優)
+
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
     {"id":1, "name":"華山1914文創園區", "district":"中正區", "lat":25.0441, "lng":121.5293, "tag":"藝文", "description":"文青必訪的展演基地，匯集設計展、快閃店與草地野餐。", "data":{"pm25":30,"noise":65,"green":30,"art":100,"sport":10}},
@@ -214,7 +216,7 @@ def checkin():
 HTML_TEMPLATE = """
 <!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><title>臺北市幸福鈴</title>
 <script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
-<style>body{font-family:sans-serif;background:#f8fafc;overflow:hidden} #map{height:100%;width:100%;z-index:1} .mood-btn{transition:all 0.2s} .mood-btn.active{background-color:#3b82f6!important;color:white!important;border-color:#3b82f6!important} .mood-btn.active i,.mood-btn.active span{color:white!important} .no-scrollbar::-webkit-scrollbar{display:none} @keyframes ring{0%,100%{transform:rotate(0)}10%,90%{transform:rotate(30deg)}30%,70%{transform:rotate(-30deg)}50%{transform:rotate(30deg)}} .bell-animation{animation:ring 1s ease-in-out}</style></head>
+<style>body{font-family:sans-serif;background:#f8fafc;overflow:hidden} #map{height:100%;width:100%;z-index:1} .mood-btn{transition:all 0.2s} .mood-btn.active{background-color:#3b82f6!important;color:white!important;border-color:#3b82f6!important} .mood-btn.active i,.mood-btn.active span{color:white!important} .no-scrollbar::-webkit-scrollbar{display:none} @keyframes ring{0%,100%{transform:rotate(0)}10%,90%{transform:rotate(30deg)}30%,70%{transform:rotate(-30deg)}50%{transform:rotate(30deg)}} .bell-animation{animation:ring 1s ease-in-out} .user-loc {animation: pulse-ring 2s infinite;} @keyframes pulse-ring {0% {box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);} 70% {box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);} 100% {box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);}}</style></head>
 <body class="flex flex-col h-screen text-slate-800">
 <nav class="bg-white shadow-sm z-50 px-4 py-3 flex justify-between items-center shrink-0 border-b border-gray-100">
 <div class="flex items-center gap-2"><div id="nav-bell" onclick="ringBell()" class="bg-blue-500 text-white p-2 rounded-xl shadow-sm cursor-pointer active:scale-95"><i class="fa-solid fa-bell text-sm"></i></div><div><h1 class="text-lg font-bold">幸福地圖</h1><div class="text-[10px] text-slate-500">Taipei Happiness Bell</div></div></div>
@@ -226,7 +228,7 @@ HTML_TEMPLATE = """
 <button onclick="showGuide()" class="absolute bottom-8 right-4 z-[500] bg-white text-slate-600 p-3 rounded-full shadow-lg hover:text-blue-600"><i class="fa-solid fa-book-open text-xl"></i></button>
 <div class="hidden md:block absolute bottom-8 left-8 bg-white/95 p-4 rounded-xl shadow-xl z-[500] text-xs backdrop-blur-sm border border-gray-100"><div class="font-bold mb-3 text-slate-700">地圖顏色說明</div><div class="space-y-2"><div class="flex items-center gap-2"><div class="w-3 h-3 bg-purple-500 rounded-full"></div><span>藝文特區</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full"></div><span>療癒綠洲</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span>運動熱點</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-blue-500 rounded-full"></div><span>放鬆角落</span></div></div></div></div>
 <div id="sidebar-panel" class="absolute bottom-0 w-full md:relative md:w-1/3 md:order-1 md:h-full z-20 flex flex-col pointer-events-none md:pointer-events-auto transition-all duration-300 ease-in-out origin-left"><div class="bg-white rounded-t-3xl md:rounded-none shadow-xl flex flex-col h-[55vh] md:h-full pointer-events-auto">
-<div class="w-full flex justify-center pt-3 pb-1 md:hidden"><div class="w-12 h-1.5 bg-gray-200 rounded-full"></div></div>
+<div class="w-full flex justify-center pt-3 pb-1 md:hidden"><div class="w-12 h-1.5 bg-gray-200 rounded-full cursor-grab active:cursor-grabbing" onclick="toggleSidebarMobile()"></div></div>
 <div class="p-5 border-b border-gray-100 bg-white shrink-0"><div class="grid grid-cols-4 gap-3">
 <button id="btn-relax" onclick="changeMood('relax')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-wind text-xl text-blue-400"></i><span class="text-xs font-bold">放鬆</span></button>
 <button id="btn-heal" onclick="changeMood('heal')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-tree text-xl text-green-500"></i><span class="text-xs font-bold">療癒</span></button>
@@ -245,7 +247,6 @@ HTML_TEMPLATE = """
         map = L.map('map', {zoomControl:false}).setView([25.06, 121.55], 12);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {attribution:'OpenStreetMap', maxZoom:19}).addTo(map);
         fetchLocations('all');
-        // 嘗試自動定位
         getLocation();
     }
     function getLocation() {
@@ -268,6 +269,15 @@ HTML_TEMPLATE = """
         if(isSidebarOpen){ sb.classList.remove('md:w-0','hidden'); sb.classList.add('md:w-1/3'); mc.classList.remove('md:w-full'); mc.classList.add('md:w-2/3'); icon.classList.replace('fa-chevron-right','fa-chevron-left'); }
         else { sb.classList.remove('md:w-1/3'); sb.classList.add('md:w-0','hidden'); mc.classList.remove('md:w-2/3'); mc.classList.add('md:w-full'); icon.classList.replace('fa-chevron-left','fa-chevron-right'); }
         setTimeout(()=>map.invalidateSize(), 300);
+    }
+    // 手機版側邊欄收合
+    function toggleSidebarMobile() {
+        const sb = document.getElementById('sidebar-panel');
+        if (sb.classList.contains('h-[55vh]')) {
+            sb.classList.remove('h-[55vh]'); sb.classList.add('h-[80px]');
+        } else {
+            sb.classList.remove('h-[80px]'); sb.classList.add('h-[55vh]');
+        }
     }
     function changeMood(m) { 
         if(currentMood === m) currentMood = 'all'; else currentMood = m;
