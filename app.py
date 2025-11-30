@@ -205,8 +205,8 @@ def get_locations():
         loc_reviews = REVIEWS.get(str(loc['id']), [])
         avg_rating = sum(r['rating'] for r in loc_reviews) / len(loc_reviews) if loc_reviews else 0
         
-        # Ensure description exists (Double check)
-        description = loc.get('description', "位於城市角落的隱藏版好去處，適合想要暫時遠離喧囂的你。")
+        # Ensure description exists (Triple check with default fallback)
+        description = loc.get('description', "這個地點暫時沒有詳細說明，但絕對值得一探究竟！")
         
         l=loc.copy(); l.update({'indices':idx, 'match_score':round(ms,1), 'tag':tag, 'weather':random.choice(WEATHER_TYPES), 'marker_color':color, 'avg_rating': round(avg_rating, 1), 'review_count': len(loc_reviews), 'description': description})
         res.append(l)
