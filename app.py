@@ -4,7 +4,7 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版)
+# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版 - 已修復描述)
 # ==========================================
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
@@ -206,7 +206,7 @@ def get_locations():
         avg_rating = sum(r['rating'] for r in loc_reviews) / len(loc_reviews) if loc_reviews else 0
         
         # Ensure description exists (Triple check with default fallback)
-        description = loc.get('description', "這個地點暫時沒有詳細說明，但絕對值得一探究竟！")
+        description = loc.get('description', "探索臺北的隱藏驚喜！這裡或許是你尋找已久的放鬆角落。")
         
         l=loc.copy(); l.update({'indices':idx, 'match_score':round(ms,1), 'tag':tag, 'weather':random.choice(WEATHER_TYPES), 'marker_color':color, 'avg_rating': round(avg_rating, 1), 'review_count': len(loc_reviews), 'description': description})
         res.append(l)
@@ -271,8 +271,8 @@ HTML_TEMPLATE = """
 <div id="map-container" class="absolute inset-0 md:relative md:w-2/3 md:order-2 z-0 transition-all duration-300 ease-in-out"><div id="map" class="h-full w-full"></div>
 <button onclick="toggleSidebar()" class="hidden md:flex absolute top-4 left-4 z-[500] bg-white text-slate-500 hover:text-blue-600 p-2 rounded shadow-md w-10 h-10 items-center justify-center transition-all"><i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left"></i></button>
 <button onclick="getLocation()" class="absolute top-4 left-4 md:top-16 z-[500] bg-white text-slate-500 hover:text-blue-600 p-2 rounded shadow-md w-10 h-10 items-center justify-center transition-all active:scale-95" title="我的位置"><i class="fa-solid fa-crosshairs"></i></button>
-<!-- 手機版說明書按鈕改到右上角 -->
-<button onclick="showGuide()" class="absolute top-20 right-4 md:top-auto md:bottom-8 md:right-4 z-[500] bg-white text-slate-600 p-2 rounded shadow-md w-10 h-10 flex items-center justify-center transition-all active:scale-95 hover:text-blue-600"><i class="fa-solid fa-book-open text-lg"></i></button>
+<!-- 修正說明書按鈕樣式 -->
+<button onclick="showGuide()" class="absolute top-20 right-4 md:top-auto md:bottom-8 md:right-4 z-[500] bg-white text-slate-600 p-0 rounded shadow-md w-10 h-10 flex items-center justify-center transition-all active:scale-95 hover:text-blue-600"><i class="fa-solid fa-book-open text-lg"></i></button>
 <div class="hidden md:block absolute bottom-8 left-8 bg-white/95 p-4 rounded-xl shadow-xl z-[500] text-xs backdrop-blur-sm border border-gray-100"><div class="font-bold mb-3 text-slate-700">地圖顏色說明</div><div class="space-y-2"><div class="flex items-center gap-2"><div class="w-3 h-3 bg-purple-500 rounded-full"></div><span>藝文特區</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full"></div><span>療癒綠洲</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span>運動熱點</span></div><div class="flex items-center gap-2"><div class="w-3 h-3 bg-orange-500 rounded-full"></div><span>放鬆角落</span></div></div></div></div>
 <div id="sidebar-panel" class="absolute bottom-0 w-full md:relative md:w-1/3 md:order-1 md:h-full z-20 flex flex-col pointer-events-none md:pointer-events-auto transition-all duration-300 ease-in-out origin-left"><div class="bg-white rounded-t-3xl md:rounded-none shadow-xl flex flex-col h-[55vh] md:h-full pointer-events-auto">
 <div class="w-full flex justify-center pt-3 pb-1 md:hidden"><div class="w-12 h-1.5 bg-gray-200 rounded-full cursor-grab active:cursor-grabbing" onclick="toggleSidebarMobile()"></div></div>
@@ -544,8 +544,7 @@ HTML_TEMPLATE = """
     function showBadges() { document.getElementById('badge-modal').classList.remove('hidden'); }
     function hideModal(id, e) { if(e.target.id===id) document.getElementById(id).classList.add('hidden'); }
     window.onload = initMap;
-</script></body></html>
-"""
+</script></body></html>"""
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
