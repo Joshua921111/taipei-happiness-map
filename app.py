@@ -4,17 +4,15 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (座標校正版)
+# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版)
 # ==========================================
-# 屬性權重：PM2.5(低優), 噪音(低優), 綠覆(高優), 藝文(高優), 運動(高優)
-
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
     {"id":1, "name":"華山1914文創園區", "district":"中正區", "lat":25.0441, "lng":121.5293, "tag":"藝文", "description":"文青必訪的展演基地，匯集設計展、快閃店與草地野餐。", "data":{"pm25":30,"noise":65,"green":30,"art":100,"sport":10}},
     {"id":2, "name":"松山文創園區", "district":"信義區", "lat":25.0439, "lng":121.5606, "tag":"藝文", "description":"菸廠古蹟活化，結合誠品書店與設計展演的文化園區。", "data":{"pm25":22,"noise":55,"green":50,"art":95,"sport":20}},
     {"id":3, "name":"中正紀念堂", "district":"中正區", "lat":25.0348, "lng":121.5217, "tag":"藝文", "description":"藍白建築與廣闊廣場，國際級展覽與藝文活動的首選展場。", "data":{"pm25":25,"noise":55,"green":60,"art":98,"sport":40}},
-    {"id":4, "name":"國立故宮博物院", "district":"士林區", "lat":25.1020, "lng":121.5485, "tag":"藝文", "description":"世界級中華文化寶庫，歷史迷與外國遊客必訪展場。", "data":{"pm25":12,"noise":35,"green":80,"art":100,"sport":10}},
-    {"id":5, "name":"臺北市立美術館", "district":"中山區", "lat":25.0726, "lng":121.5247, "tag":"藝文", "description":"臺灣首座現代美術館，純白建築與光影交織的藝術殿堂。", "data":{"pm25":20,"noise":40,"green":50,"art":100,"sport":10}},
+    {"id":4, "name":"國立故宮博物院", "district":"士林區", "lat":25.1024, "lng":121.5485, "tag":"藝文", "description":"世界級中華文化寶庫，歷史迷與外國遊客必訪展場。", "data":{"pm25":12,"noise":35,"green":80,"art":100,"sport":10}},
+    {"id":5, "name":"臺北市立美術館", "district":"中山區", "lat":25.0722, "lng":121.5246, "tag":"藝文", "description":"臺灣首座現代美術館，純白建築與光影交織的藝術殿堂。", "data":{"pm25":20,"noise":40,"green":50,"art":100,"sport":10}},
     {"id":6, "name":"台北當代藝術館", "district":"大同區", "lat":25.0504, "lng":121.5186, "tag":"藝文", "description":"日治時期小學校舍改建，前衛當代藝術的指標性展場。", "data":{"pm25":30,"noise":55,"green":10,"art":100,"sport":0}},
     {"id":7, "name":"臺北流行音樂中心", "district":"南港區", "lat":25.0519, "lng":121.5985, "tag":"藝文", "description":"仿山巒起伏的指標建築，流行音樂展演與文化的最高殿堂。", "data":{"pm25":30,"noise":60,"green":40,"art":95,"sport":20}},
     {"id":8, "name":"臺北表演藝術中心", "district":"士林區", "lat":25.0847, "lng":121.5255, "tag":"藝文", "description":"CNN評選全球最具變革性建築，國際級表演藝術場館。", "data":{"pm25":35,"noise":65,"green":10,"art":100,"sport":0}},
@@ -291,6 +289,7 @@ HTML_TEMPLATE = """
         else { sb.classList.remove('md:w-1/3'); sb.classList.add('md:w-0','hidden'); mc.classList.remove('md:w-2/3'); mc.classList.add('md:w-full'); icon.classList.replace('fa-chevron-left','fa-chevron-right'); }
         setTimeout(()=>map.invalidateSize(), 300);
     }
+    // 手機版側邊欄收合
     function toggleSidebarMobile() {
         const sb = document.getElementById('sidebar-panel');
         if (sb.classList.contains('h-[55vh]')) {
