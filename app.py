@@ -1,10 +1,10 @@
-import json, random, os
+import json, random, os, datetime
 from flask import Flask, render_template_string, jsonify, request
 
 app = Flask(__name__)
 
 # ==========================================
-# 1. 模擬 OpenData 數據庫 (200+ 地點超完整版)
+# 1. 模擬 OpenData 數據庫 (200+ 地點修復版)
 # ==========================================
 LOCATIONS = [
     # --- 藝文與創意園區 (Art) ---
@@ -169,6 +169,9 @@ WEATHER_TYPES = [{"icon":"fa-sun","text":"晴朗","color":"text-orange-500","tem
 user_points = 0
 user_steps = 0
 
+# In-memory storage for reviews
+REVIEWS = {}
+
 def calculate_happiness_indices(d):
     pm25=max(0,100-d['pm25']*1.5); noise=max(0,100-d['noise']*1.2)
     relax=(pm25+noise)/2; heal=d['green']; vitality=min(100,(d['art']*0.9+d['noise']*0.1)); energy=d['sport']
@@ -198,7 +201,14 @@ def get_locations():
             elif dom=='energy': tag="🏃‍♂️ 運動熱點"; color="#ef4444"
             else: tag="☁️ 放鬆角落"; color="#f97316"
             
-        l=loc.copy(); l.update({'indices':idx, 'match_score':round(ms,1), 'tag':tag, 'weather':random.choice(WEATHER_TYPES), 'marker_color':color})
+        # Calculate average rating
+        loc_reviews = REVIEWS.get(str(loc['id']), [])
+        avg_rating = sum(r['rating'] for r in loc_reviews) / len(loc_reviews) if loc_reviews else 0
+        
+        # Ensure description exists
+        description = loc.get('description', "這個地點暫時沒有詳細說明，但絕對值得一探究竟！")
+        
+        l=loc.copy(); l.update({'indices':idx, 'match_score':round(ms,1), 'tag':tag, 'weather':random.choice(WEATHER_TYPES), 'marker_color':color, 'avg_rating': round(avg_rating, 1), 'review_count': len(loc_reviews), 'description': description})
         res.append(l)
     if mood=='all': random.shuffle(res)
     res.sort(key=lambda x:x['match_score'], reverse=True)
@@ -216,6 +226,25 @@ def checkin():
     elif user_points >= 100: new_badge = "城市探索者"
     return jsonify({"status":"success", "message":f"抵達「{request.json.get('locationName')}」", "earned":50, "total_points":user_points, "total_steps":user_steps, "new_badge":new_badge})
 
+@app.route('/api/reviews/<loc_id>', methods=['GET'])
+def get_reviews(loc_id):
+    return jsonify(REVIEWS.get(str(loc_id), []))
+
+@app.route('/api/review', methods=['POST'])
+def submit_review():
+    data = request.json
+    loc_id = str(data.get('location_id'))
+    review = {
+        'user': '訪客',  # In a real app, this would be the logged-in user
+        'rating': int(data.get('rating')),
+        'comment': data.get('comment'),
+        'date': datetime.datetime.now().strftime("%Y-%m-%d")
+    }
+    if loc_id not in REVIEWS:
+        REVIEWS[loc_id] = []
+    REVIEWS[loc_id].insert(0, review) # Add to top
+    return jsonify({'status': 'success', 'review': review})
+
 # ================= 4. 前端介面 =================
 HTML_TEMPLATE = """
 <!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><title>臺北市幸福鈴</title>
@@ -227,7 +256,10 @@ HTML_TEMPLATE = """
 #btn-vitality.active { background-color: #a855f7 !important; border-color: #a855f7 !important; color: white !important; }
 #btn-sport.active { background-color: #ef4444 !important; border-color: #ef4444 !important; color: white !important; }
 .mood-btn.active i,.mood-btn.active span{color:white!important} 
-.no-scrollbar::-webkit-scrollbar{display:none} @keyframes ring{0%,100%{transform:rotate(0)}10%,90%{transform:rotate(30deg)}30%,70%{transform:rotate(-30deg)}50%{transform:rotate(30deg)}} .bell-animation{animation:ring 1s ease-in-out} .user-loc {animation: pulse-ring 2s infinite;} @keyframes pulse-ring {0% {box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);} 70% {box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);} 100% {box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);}}</style></head>
+.no-scrollbar::-webkit-scrollbar{display:none} @keyframes ring{0%,100%{transform:rotate(0)}10%,90%{transform:rotate(30deg)}30%,70%{transform:rotate(-30deg)}50%{transform:rotate(30deg)}} .bell-animation{animation:ring 1s ease-in-out} .user-loc {animation: pulse-ring 2s infinite;} @keyframes pulse-ring {0% {box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);} 70% {box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);} 100% {box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);}}
+.rating-star { cursor: pointer; color: #d1d5db; }
+.rating-star.active { color: #f59e0b; }
+</style></head>
 <body class="flex flex-col h-screen text-slate-800">
 <nav class="bg-white shadow-sm z-50 px-4 py-3 flex justify-between items-center shrink-0 border-b border-gray-100">
 <div class="flex items-center gap-2"><div id="nav-bell" onclick="ringBell()" class="bg-blue-500 text-white p-2 rounded-xl shadow-sm cursor-pointer active:scale-95"><i class="fa-solid fa-bell text-sm"></i></div><div><h1 class="text-lg font-bold">幸福地圖</h1><div class="text-[10px] text-slate-500">Taipei Happiness Bell</div></div></div>
@@ -250,24 +282,94 @@ HTML_TEMPLATE = """
 <button id="btn-vitality" onclick="changeMood('vitality')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-palette text-xl text-purple-500"></i><span class="text-xs font-bold">藝文</span></button>
 <button id="btn-sport" onclick="changeMood('sport')" class="mood-btn border border-slate-100 bg-slate-50 text-slate-600 p-2.5 rounded-2xl flex flex-col items-center gap-1.5"><i class="fa-solid fa-person-running text-xl text-red-500"></i><span class="text-xs font-bold">運動</span></button>
 </div></div><div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 no-scrollbar" id="location-list"></div></div></div></div>
+
+<!-- Guide Modal -->
 <div id="guide-modal" class="hidden fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm" onclick="hideModal('guide-modal',event)"><div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative overflow-hidden" onclick="event.stopPropagation()"><div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-500 to-blue-600 -z-10"></div><div class="flex justify-between items-center mb-6 text-white relative z-10"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-book-open"></i> 使用指南</h3><button onclick="document.getElementById('guide-modal').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button></div><div class="space-y-6 max-h-[60vh] overflow-y-auto pr-2 no-scrollbar">
 <div><h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fa-solid fa-chart-pie text-blue-500"></i> 幸福契合度 (左側數字)</h4><p class="text-sm text-slate-600 bg-blue-50 p-3 rounded-xl">卡片左側的圓形數字代表該地點與您當前選擇心情的<b>「契合百分比」</b> (0-100分)。<br>分數越高，代表該地點的環境數據 (如空氣、綠地、噪音) 越符合您的需求。</p></div>
 <div><h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fa-solid fa-palette text-purple-500"></i> 顏色代表</h4><div class="grid grid-cols-2 gap-3 text-sm"><div class="flex items-center gap-2 bg-purple-50 p-2 rounded-lg"><div class="w-3 h-3 bg-purple-500 rounded-full"></div>藝文特區</div><div class="flex items-center gap-2 bg-green-50 p-2 rounded-lg"><div class="w-3 h-3 bg-green-500 rounded-full"></div>療癒綠洲</div><div class="flex items-center gap-2 bg-red-50 p-2 rounded-lg"><div class="w-3 h-3 bg-red-500 rounded-full"></div>運動熱點</div><div class="flex items-center gap-2 bg-orange-50 p-2 rounded-lg"><div class="w-3 h-3 bg-orange-500 rounded-full"></div>放鬆角落</div></div></div></div><button onclick="document.getElementById('guide-modal').classList.add('hidden')" class="mt-6 w-full py-3 bg-slate-100 rounded-xl font-bold text-slate-600">我瞭解了</button></div></div>
+
+<!-- Checkin Modal -->
 <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 z-[2000] flex items-center justify-center p-6 backdrop-blur-sm transition-opacity opacity-0"><div class="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-8 text-center transform scale-90 transition-transform relative overflow-hidden"><div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-yellow-50 to-white -z-10"></div><div class="relative mb-6"><div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto shadow-lg border-4 border-yellow-50"><i id="bell-icon" class="fa-solid fa-bell text-5xl text-yellow-500"></i></div><div class="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">TASK COMPLETED</div></div><h3 class="text-2xl font-bold text-slate-800 mb-1">任務達成！</h3><p id="modal-text" class="text-sm text-slate-500 mb-6">成功抵達探索地點</p><div class="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100"><div class="flex justify-between items-center mb-2"><span class="text-slate-500 text-xs font-bold uppercase">獲得積分</span><span class="font-bold text-yellow-600 flex items-center gap-1 text-lg">+<span id="modal-points">0</span></span></div>
 <div class="flex justify-between items-center mb-2"><span class="text-slate-500 text-xs font-bold uppercase">累積步數</span><span class="font-bold text-blue-600 flex items-center gap-1 text-lg"><i class="fa-solid fa-shoe-prints text-sm"></i> <span id="modal-steps">0</span></span></div>
 <div id="badge-notification" class="hidden pt-2 border-t border-slate-200 mt-2"><div class="text-xs text-blue-500 font-bold mb-1">獲得新獎章！</div><div class="flex items-center justify-center gap-2 text-slate-700 font-bold"><i class="fa-solid fa-medal text-blue-500"></i> <span id="badge-name"></span></div></div></div><button onclick="closeModal()" class="w-full bg-slate-800 text-white py-3.5 rounded-xl font-bold shadow-lg active:scale-95 transition-all">收下獎勵</button></div></div>
+
+<!-- Badge Modal -->
 <div id="badge-modal" class="hidden fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm" onclick="hideModal('badge-modal', event)"><div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl" onclick="event.stopPropagation()"><h3 class="font-bold text-lg mb-4 flex items-center gap-2"><i class="fa-solid fa-medal text-blue-500"></i> 我的成就獎章</h3><div class="grid grid-cols-3 gap-4 text-center"><div class="flex flex-col items-center gap-2 opacity-100"><div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500"><i class="fa-solid fa-user"></i></div><span class="text-xs font-bold text-slate-600">新手上路</span></div><div class="flex flex-col items-center gap-2 opacity-40 grayscale" id="badge-explorer"><div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-500"><i class="fa-solid fa-compass"></i></div><span class="text-xs font-bold text-slate-600">城市探索者</span></div><div class="flex flex-col items-center gap-2 opacity-40 grayscale" id="badge-data"><div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-500"><i class="fa-solid fa-chart-pie"></i></div><span class="text-xs font-bold text-slate-600">數據大師</span></div></div>
 <div class="mt-6 p-3 bg-gray-50 rounded-xl text-center"><div class="text-xs text-slate-500 font-bold uppercase mb-1">目前累積步數 (模擬)</div><div class="text-2xl font-bold text-blue-600"><i class="fa-solid fa-shoe-prints"></i> <span id="badge-steps">0</span></div></div>
 <button onclick="document.getElementById('badge-modal').classList.add('hidden')" class="mt-4 w-full py-2 bg-gray-100 rounded-lg text-sm font-bold text-gray-600">關閉</button></div></div>
+
+<!-- Review Modal -->
+<div id="review-modal" class="hidden fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm" onclick="hideModal('review-modal', event)">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl relative overflow-hidden" onclick="event.stopPropagation()">
+        <h3 class="text-lg font-bold mb-4">評價與評論 - <span id="review-location-name"></span></h3>
+        
+        <!-- Review Form -->
+        <div class="mb-6 border-b pb-4">
+            <div class="flex items-center justify-center gap-2 mb-3 text-2xl" id="star-input">
+                <i class="fa-solid fa-star rating-star" data-value="1"></i>
+                <i class="fa-solid fa-star rating-star" data-value="2"></i>
+                <i class="fa-solid fa-star rating-star" data-value="3"></i>
+                <i class="fa-solid fa-star rating-star" data-value="4"></i>
+                <i class="fa-solid fa-star rating-star" data-value="5"></i>
+            </div>
+            <textarea id="review-comment" class="w-full border rounded-lg p-2 text-sm mb-3" rows="3" placeholder="寫下您的心得..."></textarea>
+            <button onclick="submitReview()" class="w-full bg-blue-500 text-white py-2 rounded-lg font-bold hover:bg-blue-600">提交評論</button>
+        </div>
+
+        <!-- Reviews List -->
+        <div class="max-h-[40vh] overflow-y-auto no-scrollbar space-y-3" id="reviews-list">
+            <!-- Reviews will be injected here -->
+        </div>
+
+        <button onclick="document.getElementById('review-modal').classList.add('hidden')" class="mt-4 w-full py-2 bg-gray-100 rounded-lg text-sm font-bold text-gray-600">關閉</button>
+    </div>
+</div>
+
+<!-- Bus Modal -->
+<div id="bus-modal" class="hidden fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm" onclick="hideModal('bus-modal', event)">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl relative overflow-hidden" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+            <h3 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-bus text-yellow-500"></i> 公車動態</h3>
+            <button onclick="document.getElementById('bus-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="space-y-2 max-h-[50vh] overflow-y-auto no-scrollbar" id="bus-list">
+            <!-- Bus info injected here -->
+        </div>
+        <div class="mt-3 text-xs text-gray-400 text-center">資料來源：臺北市公共運輸處 (模擬)</div>
+    </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     let map, markers=[], currentLocations=[], isSidebarOpen=true, currentMood='all', userLocationMarker=null;
+    let currentReviewLocationId = null;
+    let selectedRating = 5;
+
     function initMap() {
         map = L.map('map', {zoomControl:false}).setView([25.06, 121.55], 12);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {attribution:'OpenStreetMap', maxZoom:19}).addTo(map);
         fetchLocations('all');
         getLocation();
+        
+        // Setup star rating interaction
+        document.querySelectorAll('.rating-star').forEach(star => {
+            star.addEventListener('click', function() {
+                selectedRating = this.getAttribute('data-value');
+                updateStarDisplay(selectedRating);
+            });
+        });
     }
+    
+    function updateStarDisplay(rating) {
+        document.querySelectorAll('.rating-star').forEach(star => {
+            if (star.getAttribute('data-value') <= rating) {
+                star.classList.add('active');
+            } else {
+                star.classList.remove('active');
+            }
+        });
+    }
+
     function getLocation() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(showPosition, (e)=>console.log(e), {enableHighAccuracy:true});
@@ -289,7 +391,6 @@ HTML_TEMPLATE = """
         else { sb.classList.remove('md:w-1/3'); sb.classList.add('md:w-0','hidden'); mc.classList.remove('md:w-2/3'); mc.classList.add('md:w-full'); icon.classList.replace('fa-chevron-left','fa-chevron-right'); }
         setTimeout(()=>map.invalidateSize(), 300);
     }
-    // 手機版側邊欄收合
     function toggleSidebarMobile() {
         const sb = document.getElementById('sidebar-panel');
         if (sb.classList.contains('h-[55vh]')) {
@@ -312,19 +413,35 @@ HTML_TEMPLATE = """
         const list = document.getElementById('location-list'); list.innerHTML='';
         currentLocations.forEach(loc => {
             const icon = L.divIcon({className:'custom-div-icon', html:`<div style="background-color:${loc.marker_color}; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 3px 6px rgba(0,0,0,0.2);"></div>`, iconSize:[16,16], iconAnchor:[8,8]});
+            
+            let starsHtml = '';
+            for(let i=1; i<=5; i++) {
+                starsHtml += `<i class="fa-solid fa-star ${i <= Math.round(loc.avg_rating) ? 'text-yellow-400' : 'text-gray-300'} text-xs"></i>`;
+            }
+
             const popup = `
-                <div class="font-sans min-w-[220px] p-1">
+                <div class="font-sans min-w-[240px] p-1">
                     <div class="flex justify-between items-center mb-2"><span class="text-xs font-bold text-slate-400 uppercase whitespace-nowrap">${loc.district}</span><span class="text-xs font-bold ${loc.weather.color} whitespace-nowrap"><i class="fa-solid ${loc.weather.icon}"></i> ${loc.weather.temp}</span></div>
-                    <h3 class="font-bold text-lg text-slate-800 mb-1 leading-tight">${loc.name}</h3><div class="text-xs text-slate-500 mb-3">${loc.tag}</div>
-                    <div class="text-xs text-slate-600 mb-3 leading-relaxed">${loc.description}</div>
+                    <h3 class="font-bold text-lg text-slate-800 mb-1 leading-tight">${loc.name}</h3>
+                    <div class="flex items-center gap-1 mb-2">
+                        <div class="flex">${starsHtml}</div>
+                        <span class="text-xs text-gray-500">(${loc.review_count})</span>
+                    </div>
+                    <div class="text-xs text-slate-500 mb-3">${loc.tag}</div>
+                    <div class="text-xs text-slate-600 mb-3 leading-relaxed line-clamp-2">${loc.description}</div>
                     <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 mb-3 space-y-1.5">
                         <div class="flex items-center text-[10px] text-slate-500"><span class="w-10 whitespace-nowrap">PM2.5</span><div class="flex-1 ml-2 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-blue-400" style="width:${100-loc.data.pm25}%"></div></div></div>
                         <div class="flex items-center text-[10px] text-slate-500"><span class="w-10 whitespace-nowrap">綠覆率</span><div class="flex-1 ml-2 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-green-500" style="width:${loc.data.green}%"></div></div></div>
                         <div class="flex items-center text-[10px] text-slate-500"><span class="w-10 whitespace-nowrap">藝文</span><div class="flex-1 ml-2 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-purple-500" style="width:${loc.data.art}%"></div></div></div>
                     </div>
-                    <div class="grid grid-cols-2 gap-2"><a href="https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}" target="_blank" class="text-center bg-white border border-slate-200 text-slate-600 text-xs py-2 rounded-lg font-bold hover:bg-slate-50 whitespace-nowrap">導航</a><button onclick="checkIn('${loc.name}')" class="bg-blue-600 text-white text-xs py-2 rounded-lg font-bold hover:bg-blue-700 shadow-sm whitespace-nowrap">打卡</button></div>
+                    <div class="grid grid-cols-4 gap-1">
+                        <a href="https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}" target="_blank" class="col-span-2 text-center bg-white border border-slate-200 text-slate-600 text-xs py-2 rounded-lg font-bold hover:bg-slate-50 whitespace-nowrap">導航</a>
+                        <button onclick="showBusInfo('${loc.name}')" class="bg-yellow-400 text-white text-xs py-2 rounded-lg font-bold hover:bg-yellow-500 shadow-sm"><i class="fa-solid fa-bus"></i></button>
+                        <button onclick="openReviewModal(${loc.id}, '${loc.name}')" class="bg-orange-400 text-white text-xs py-2 rounded-lg font-bold hover:bg-orange-500 shadow-sm"><i class="fa-solid fa-comment-dots"></i></button>
+                    </div>
+                    <button onclick="checkIn('${loc.name}')" class="mt-2 w-full bg-blue-600 text-white text-xs py-2 rounded-lg font-bold hover:bg-blue-700 shadow-sm whitespace-nowrap">打卡任務</button>
                 </div>`;
-            const m = L.marker([loc.lat, loc.lng], {icon}).addTo(map).bindPopup(popup, {maxWidth:260, minWidth:220, autoPanPadding:[20,20]});
+            const m = L.marker([loc.lat, loc.lng], {icon}).addTo(map).bindPopup(popup, {maxWidth:280, minWidth:240, autoPanPadding:[20,20]});
             markers.push(m);
             const card = document.createElement('div');
             card.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md hover:border-blue-100";
@@ -338,6 +455,29 @@ HTML_TEMPLATE = """
             list.appendChild(card);
         });
     }
+    
+    function showBusInfo(name) {
+        const busList = document.getElementById('bus-list');
+        busList.innerHTML = '';
+        const routes = ['204', '307', '262', '651', '212', '承德幹線', '信義幹線', '藍29'];
+        const statuses = ['進站中', '約 3 分', '約 5 分', '約 8 分', '約 12 分'];
+        
+        const numRoutes = Math.floor(Math.random() * 3) + 2; // 2-4 routes
+        for(let i=0; i<numRoutes; i++) {
+            const route = routes[Math.floor(Math.random() * routes.length)];
+            const status = statuses[Math.floor(Math.random() * statuses.length)];
+            let color = 'text-gray-600';
+            if(status === '進站中') color = 'text-red-500 font-bold blink';
+            else if(status.includes('3') || status.includes('5')) color = 'text-yellow-600 font-bold';
+            
+            const item = document.createElement('div');
+            item.className = "flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-100";
+            item.innerHTML = `<div class="flex items-center gap-2"><span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">${route}</span><span>往 台北車站</span></div><span class="text-xs ${color}">${status}</span>`;
+            busList.appendChild(item);
+        }
+        document.getElementById('bus-modal').classList.remove('hidden');
+    }
+
     async function checkIn(name) {
         map.closePopup();
         try {
@@ -356,6 +496,40 @@ HTML_TEMPLATE = """
             document.getElementById('bell-icon').classList.add('bell-animation'); setTimeout(()=>document.getElementById('bell-icon').classList.remove('bell-animation'), 1000);
         } catch(e){}
     }
+    
+    async function openReviewModal(id, name) {
+        currentReviewLocationId = id;
+        document.getElementById('review-location-name').innerText = name;
+        document.getElementById('review-modal').classList.remove('hidden');
+        document.getElementById('review-comment').value = '';
+        updateStarDisplay(5);
+        selectedRating = 5;
+        const res = await fetch(`/api/reviews/${id}`);
+        const reviews = await res.json();
+        const list = document.getElementById('reviews-list');
+        list.innerHTML = '';
+        if(reviews.length === 0) {
+            list.innerHTML = '<div class="text-center text-gray-400 text-sm py-4">尚無評論，成為第一個評論的人吧！</div>';
+        } else {
+            reviews.forEach(r => {
+                let stars = '';
+                for(let i=1; i<=5; i++) stars += `<i class="fa-solid fa-star ${i<=r.rating ? 'text-yellow-400' : 'text-gray-200'} text-xs"></i>`;
+                const item = document.createElement('div');
+                item.className = "bg-slate-50 p-3 rounded-lg border border-slate-100";
+                item.innerHTML = `<div class="flex justify-between items-center mb-1"><span class="font-bold text-sm text-slate-700">${r.user}</span><span class="text-[10px] text-slate-400">${r.date}</span></div><div class="flex mb-1">${stars}</div><p class="text-xs text-slate-600">${r.comment}</p>`;
+                list.appendChild(item);
+            });
+        }
+    }
+    
+    async function submitReview() {
+        const comment = document.getElementById('review-comment').value;
+        if(!comment) return alert('請輸入評論內容');
+        await fetch('/api/review', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ location_id: currentReviewLocationId, rating: selectedRating, comment: comment }) });
+        openReviewModal(currentReviewLocationId, document.getElementById('review-location-name').innerText);
+        fetchLocations(currentMood);
+    }
+
     function updateLocalBadges(p) { 
         if(p>=100) document.getElementById('badge-explorer').classList.remove('opacity-40','grayscale'); 
         if(p>=300) document.getElementById('badge-data').classList.remove('opacity-40','grayscale'); 
