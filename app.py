@@ -1,4 +1,4 @@
-import json, random, os, datetime
+import json, random, os, datetime, math
 from flask import Flask, render_template_string, jsonify, request
 
 app = Flask(__name__)
@@ -296,7 +296,7 @@ HTML_TEMPLATE = """
 
 <!-- Badge Modal -->
 <div id="badge-modal" class="hidden fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm" onclick="hideModal('badge-modal', event)"><div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl" onclick="event.stopPropagation()"><h3 class="font-bold text-lg mb-4 flex items-center gap-2"><i class="fa-solid fa-medal text-blue-500"></i> 我的成就獎章</h3><div class="grid grid-cols-3 gap-4 text-center"><div class="flex flex-col items-center gap-2 opacity-100"><div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500"><i class="fa-solid fa-user"></i></div><span class="text-xs font-bold text-slate-600">新手上路</span></div><div class="flex flex-col items-center gap-2 opacity-40 grayscale" id="badge-explorer"><div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-500"><i class="fa-solid fa-compass"></i></div><span class="text-xs font-bold text-slate-600">城市探索者</span></div><div class="flex flex-col items-center gap-2 opacity-40 grayscale" id="badge-data"><div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-500"><i class="fa-solid fa-chart-pie"></i></div><span class="text-xs font-bold text-slate-600">數據大師</span></div></div>
-<div class="mt-6 p-3 bg-gray-50 rounded-xl text-center"><div class="text-xs text-slate-500 font-bold uppercase mb-1">目前累積步數 (模擬)</div><div class="text-2xl font-bold text-blue-600"><i class="fa-solid fa-shoe-prints"></i> <span id="badge-steps">0</span></div></div>
+<div class="mt-6 p-3 bg-gray-50 rounded-xl text-center"><div class="text-xs text-slate-500 font-bold uppercase mb-1">目前累積步數)</div><div class="text-2xl font-bold text-blue-600"><i class="fa-solid fa-shoe-prints"></i> <span id="badge-steps">0</span></div></div>
 <button onclick="document.getElementById('badge-modal').classList.add('hidden')" class="mt-4 w-full py-2 bg-gray-100 rounded-lg text-sm font-bold text-gray-600">關閉</button></div></div>
 
 <!-- Review Modal -->
@@ -336,7 +336,7 @@ HTML_TEMPLATE = """
         <div class="space-y-2 max-h-[50vh] overflow-y-auto no-scrollbar" id="bus-list">
             <!-- Bus info injected here -->
         </div>
-        <div class="mt-3 text-xs text-gray-400 text-center">資料來源：臺北市公共運輸處 (模擬)</div>
+        <div class="mt-3 text-xs text-gray-400 text-center">資料來源：臺北市公共運輸處</div>
     </div>
 </div>
 
